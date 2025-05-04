@@ -10,6 +10,8 @@ This package is based on the modeling approach presented in the article:
 
 **Gilassi, Sina, Seyed Mohammad Taghavi, Denis Rodrigue, and Serge Kaliaguine. "Simulation of gas separation using partial element stage cut modeling of hollow fiber membrane modules." AIChE Journal 64, no. 5 (2018): 1766-1777.**
 
+[https://doi.org/10.1002/aic.16044](https://doi.org/10.1002/aic.16044)
+
 This methodology allows accurate simulation of gas separation performance across hollow fiber membrane modules by considering differential elements and stage cut variations. PyMemLab implements this approach in a flexible computational framework.
 
 ## 🚀 Key Features
