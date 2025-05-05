@@ -1,5 +1,9 @@
 # PyMemLab
 
+![PyMemLab](https://drive.google.com/uc?export=view&id=1PCmloxGYElTfuxIVDTV9Objt6cucJ3KC)
+
+![Downloads](https://img.shields.io/pypi/dm/PyMemLab) ![PyPI](https://img.shields.io/pypi/v/PyMemLab) ![Python Version](https://img.shields.io/pypi/pyversions/PyMemLab.svg) ![License](https://img.shields.io/pypi/l/PyMemLab) ![Read the Docs](https://img.shields.io/readthedocs/PyMemLab)
+
 **PyMemLab** is a versatile and extensible Python package designed for engineers, researchers, and scientists working in the field of membrane separations. It provides a laboratory-like environment where users can model membrane transport, simulate separation processes, and perform parametric studies or process optimization.
 
 Whether you're designing new membrane modules, evaluating separation performance, or testing novel materials, **PyMemLab** offers the computational tools to support your work.
@@ -17,7 +21,7 @@ This methodology allows accurate simulation of gas separation performance across
 ## 🚀 Key Features
 
 - **Permeation modeling** for gaseous mixtures.
-- Support for different **membrane configurations** (co-current, counter-current, etc.).
+- Support for different **membrane configurations** (co-current, counter-current, and cross-flow).
 - **Process optimization** capabilities.
 - Easy integration with **NumPy**, **SciPy**, **Pandas**, and **Matplotlib** for data handling and visualization.
 
