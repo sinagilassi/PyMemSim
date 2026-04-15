@@ -1,5 +1,5 @@
 # settings
-from .config import __package__, __version__, __description__, __author__
+from .configs import __package__, __version__, __description__, __author__
 from .app import hfm_module
 from .docs import HFM
 

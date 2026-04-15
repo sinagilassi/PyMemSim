@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pymemsim"
+version = "0.1.0"
+description = "PyMemSim is a Python package for modelling of membrane-based separation systems."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Sina Gilassi", email = "sina.gilassi@gmail.com"}
+]
+keywords = [
+    "chemical-engineering",
+    "process-simulation",
+    "process-modelling",
+    "membrane-separation",
+    "hollow-fiber-membrane",
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: Unix",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+]
+dependencies = [
+    "numpy>=2.4.3",
+    "scipy>=1.17.1",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "rich>=14.3.3",
+    "pycuc>=2.7.0",
+    "pythermodb>=1.12.2",
+    "pythermolinkdb>=1.4.14",
+    "pythermodb-settings>=0.2.10",
+    "pyreactlab-core>=0.1.6",
+    "pythermocalcdb>=0.10.0",
+    "matplotlib>=3.10.8",
+]
+
+[project.urls]
+Homepage = "https://github.com/sinagilassi/PyMemSim"
+Source = "https://github.com/sinagilassi/PyMemSim"
+Tracker = "https://github.com/sinagilassi/PyMemSim/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+exclude = [
+    "tests",
+    "tests.*",
+    "examples",
+    "examples.*",
+    "notebooks",
+    "notebooks.*",
+    "statics",
+    "statics.*",
+    "private",
+    "private.*",
+    "app",
+    "app.*"
+]
+
+[tool.setuptools.package-data]
+pymemsim = [
+    "config/*.yml",
+    "data/*.csv",
+    "templates/*.html",
+    "static/*",
+    "static/**/*"
+]

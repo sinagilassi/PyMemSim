@@ -1,6 +1,6 @@
 # import libs
 from rich import print
-import PyMemLab as pml
+import pymemsim as pml
 
 # check version
 print(pml.__version__)
