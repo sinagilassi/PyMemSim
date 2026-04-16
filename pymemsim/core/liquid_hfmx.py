@@ -8,98 +8,93 @@ from .liquid_hfm import LiquidHFM
 
 class LiquidHFMX(LiquidHFM):
     """
-    Scaled liquid-phase hollow fiber membrane model.
-
-    Physical balances are inherited from LiquidHFM; only solver-state
-    scaling/unscaling is added.
+    Scaled liquid-phase HFM model.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Species scaling from inlet component molar flows.
-        self.F_scale = np.maximum(self.F_in.astype(float), 1e-8)
+        self.Ff_scale = np.maximum(self.Ff_in.astype(float), 1e-8)
+        self.Fp_scale = np.maximum(np.where(self.Fp_in > 0.0, self.Fp_in, 1e-8), 1e-8)
 
-        # T_scale_ref is the numerical scaling center, not thermodynamic reference state.
-        self.T_scale_ref = float(self._T_in)
-        self.T_scale = 100.0  # K
+        self.Tf_scale_ref = float(self.Tf_in)
+        self.Tp_scale_ref = float(self.Tp_in)
+        self.T_scale = 100.0
 
     def build_y0_scaled(self) -> np.ndarray:
-        """
-        Build scaled inlet state vector for solve_ivp.
-        """
-        f0_scaled = self.F_in.astype(float) / self.F_scale
-        y0_parts = [f0_scaled]
-
+        y0_parts = [
+            self.Ff_in.astype(float) / self.Ff_scale,
+            self.Fp_in.astype(float) / self.Fp_scale,
+        ]
         if self.heat_transfer_mode == "non-isothermal":
-            theta0 = (float(self._T_in) - self.T_scale_ref) / self.T_scale
-            y0_parts.append(np.array([theta0], dtype=float))
-
-        if len(y0_parts) == 1:
-            return y0_parts[0]
+            theta_f0 = (float(self.Tf_in) - self.Tf_scale_ref) / self.T_scale
+            theta_p0 = (float(self.Tp_in) - self.Tp_scale_ref) / self.T_scale
+            y0_parts.append(np.array([theta_f0, theta_p0], dtype=float))
         return np.concatenate(y0_parts)
 
-    def _unscale_state(self, y_scaled: np.ndarray) -> Tuple[np.ndarray, float]:
-        """
-        Convert scaled state vector to physical units.
-        """
+    def _unscale_state(self, y_scaled: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float, float]:
         ns = self.component_num
+        idx = 2 * ns
 
-        F = np.asarray(
+        Ff = np.asarray(
             smooth_floor(y_scaled[:ns], xmin=0.0, s=1e-9),
             dtype=float
-        ) * self.F_scale
+        ) * self.Ff_scale
+        Fp = np.asarray(
+            smooth_floor(y_scaled[ns:2 * ns], xmin=0.0, s=1e-9),
+            dtype=float
+        ) * self.Fp_scale
 
         if self.heat_transfer_mode == "non-isothermal":
-            theta = float(y_scaled[ns])
-            temp = self.T_scale_ref + self.T_scale * theta
-            temp = float(smooth_floor(temp, xmin=1.0, s=1e-3))
+            theta_f = float(y_scaled[idx])
+            theta_p = float(y_scaled[idx + 1])
+            Tf = float(smooth_floor(self.Tf_scale_ref + self.T_scale * theta_f, xmin=1.0, s=1e-3))
+            Tp = float(smooth_floor(self.Tp_scale_ref + self.T_scale * theta_p, xmin=1.0, s=1e-3))
         else:
-            temp = float(self._T_in)
+            Tf = float(self.Tf_in)
+            Tp = float(self.Tp_in)
 
-        return F, temp
+        return Ff, Fp, Tf, Tp
 
     def _scale_rhs(
         self,
-        dF_dV: np.ndarray,
-        dT_dV: Optional[float] = None
+        dFf_dz: np.ndarray,
+        dFp_dz: np.ndarray,
+        dTf_dz: Optional[float] = None,
+        dTp_dz: Optional[float] = None
     ) -> np.ndarray:
-        """
-        Convert physical derivatives to scaled derivatives.
-        """
-        dF_scaled_dV = dF_dV / self.F_scale
+        out = [dFf_dz / self.Ff_scale, dFp_dz / self.Fp_scale]
 
-        if dT_dV is None:
-            return dF_scaled_dV
+        if dTf_dz is not None and dTp_dz is not None:
+            out.append(np.array([dTf_dz / self.T_scale, dTp_dz / self.T_scale], dtype=float))
 
-        dtheta_dV = dT_dV / self.T_scale
-        return np.concatenate([dF_scaled_dV, np.array([dtheta_dV], dtype=float)])
+        return np.concatenate(out)
 
-    def rhs_physical(self, V: float, y: np.ndarray) -> np.ndarray:
-        """
-        Physical RHS wrapper.
-        """
-        return super().rhs(V, y)
+    def rhs_physical(self, z: float, y: np.ndarray) -> np.ndarray:
+        return super().rhs(z, y)
 
-    def rhs_scaled(self, V: float, y_scaled: np.ndarray) -> np.ndarray:
-        """
-        Scaled RHS for solve_ivp.
-        """
+    def rhs_scaled(self, z: float, y_scaled: np.ndarray) -> np.ndarray:
         ns = self.component_num
 
-        F, temp = self._unscale_state(y_scaled)
-
+        Ff, Fp, Tf, Tp = self._unscale_state(y_scaled)
+        y_parts = [Ff, Fp]
         if self.heat_transfer_mode == "non-isothermal":
-            y_physical = np.concatenate([F, np.array([temp], dtype=float)])
-        else:
-            y_physical = F
+            y_parts.append(np.array([Tf, Tp], dtype=float))
+        y_physical = np.concatenate(y_parts)
 
-        dy_physical_dV = self.rhs_physical(V, y_physical)
+        dy_physical_dz = self.rhs_physical(z, y_physical)
 
-        dF_dV = dy_physical_dV[:ns]
+        dFf_dz = dy_physical_dz[:ns]
+        dFp_dz = dy_physical_dz[ns:2 * ns]
 
         if self.heat_transfer_mode == "isothermal":
-            return self._scale_rhs(dF_dV=dF_dV)
+            return self._scale_rhs(dFf_dz=dFf_dz, dFp_dz=dFp_dz)
 
-        dT_dV = float(dy_physical_dV[ns])
-        return self._scale_rhs(dF_dV=dF_dV, dT_dV=dT_dV)
+        dTf_dz = float(dy_physical_dz[2 * ns])
+        dTp_dz = float(dy_physical_dz[2 * ns + 1])
+        return self._scale_rhs(
+            dFf_dz=dFf_dz,
+            dFp_dz=dFp_dz,
+            dTf_dz=dTf_dz,
+            dTp_dz=dTp_dz
+        )

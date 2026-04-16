@@ -61,6 +61,41 @@ class MembraneCore:
         # lower case keys for easier access
         self.model_inputs_keys = collect_keys(self.model_inputs)
 
+    def _extract_value_unit(self, value: Any) -> Tuple[float, str]:
+        """
+        Extract a numeric value and unit from scalar/model/mapping input.
+
+        Returns
+        -------
+        Tuple[float, str]
+            (value, unit). Unit defaults to empty string when unavailable.
+        """
+        if isinstance(value, (int, float)):
+            return float(value), ""
+
+        if isinstance(value, dict):
+            if "value" in value:
+                return float(value["value"]), str(value.get("unit", ""))
+            raise ValueError("Mapping input must contain a 'value' key.")
+
+        if hasattr(value, "value"):
+            v = float(getattr(value, "value"))
+            u = str(getattr(value, "unit", ""))
+            return v, u
+
+        raise ValueError(f"Unsupported value type: {type(value)}")
+
+    def _to_mol_per_s_value(self, value: Any) -> float:
+        """
+        Convert supported scalar/model/mapping input to mol/s.
+        """
+        raw_value, raw_unit = self._extract_value_unit(value)
+        unit = raw_unit.strip()
+        if unit == "":
+            # default assumption for naked numbers
+            return float(raw_value)
+        return to_mol_per_s(value=raw_value, unit=unit)
+
     # SECTION: Model Inputs configuration
     # NOTE: is isothermal
     @property
@@ -264,34 +299,66 @@ class MembraneCore:
         """
         Configure the inlet mole flows for each component in the reactor
         """
-        # check mode
-        if 'inlet_flows' not in self.model_inputs_keys:
+        return self.config_inlet_mole_flows_by_key(
+            key="inlet_flows",
+            required=True,
+            default_component_value=0.0
+        )
+
+    def config_inlet_mole_flows_by_key(
+            self,
+            key: str,
+            required: bool = True,
+            default_component_value: float = 0.0
+    ) -> Tuple[Dict[str, float], np.ndarray, float]:
+        """
+        Configure component inlet mole flows from an arbitrary model_inputs key.
+
+        Parameters
+        ----------
+        key : str
+            model_inputs key containing {component_id: flow_value}.
+        required : bool, optional
+            If True, missing key raises ValueError. If False, uses defaults.
+        default_component_value : float, optional
+            Default mol/s for missing components when not required.
+        """
+        if key not in self.model_inputs_keys:
+            if required:
+                raise ValueError(f"'{key}' must be provided in model_inputs.")
+            default_array = np.full(
+                self.component_num, float(default_component_value), dtype=float
+            )
+            default_comp = {
+                comp_id: float(default_component_value)
+                for comp_id in self.component_formula_state
+            }
+            return default_comp, default_array, float(np.sum(default_array))
+
+        mole_flow = self.model_inputs[key]
+        if not isinstance(mole_flow, dict):
             raise ValueError(
-                "inlet_flow must be provided in model_inputs."
+                f"'{key}' must be a mapping of component ids to flow values."
             )
 
         res_comp: Dict[str, float] = {}
         res: List[float] = []
-        mole_flow = self.model_inputs['inlet_flows']
         mole_flow_keys = set(mole_flow.keys())
 
         for comp_id in self.component_formula_state:
             if comp_id not in mole_flow_keys:
-                raise ValueError(
-                    f"Missing feed_mole_flow entry for component '{comp_id}'."
-                )
+                if required:
+                    raise ValueError(
+                        f"Missing mole flow entry for component '{comp_id}' in '{key}'."
+                    )
+                value_ = float(default_component_value)
+            else:
+                value_ = self._to_mol_per_s_value(mole_flow[comp_id])
 
-            # convert to mol/s
-            value_ = to_mol_per_s(
-                value=float(mole_flow[comp_id].value),
-                unit=mole_flow[comp_id].unit
-            )
             res_comp[comp_id] = value_
             res.append(value_)
 
-        # total inlet mole flow
-        inlet_flow_total = sum(res)
-
+        inlet_flow_total = float(sum(res))
         return res_comp, np.array(res, dtype=float), inlet_flow_total
 
     # NOTE: inlet mole flow total configuration
