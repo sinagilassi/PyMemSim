@@ -35,6 +35,8 @@ def create_hfm_module(
         A ThermoSource object containing the thermodynamic source information for the batch reactor simulation.
     **kwargs
         Additional keyword arguments for future extensions.
+        - mode : Literal['silent', 'log', 'attach'], optional
+                Mode for time measurement logging. Default is 'silent'.
 
     Returns
     -------

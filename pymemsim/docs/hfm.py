@@ -55,7 +55,7 @@ class HFM:
             component_key=cast(ComponentKey, self.component_key),
         )
 
-        self.module: GasHFM | GasHFMX = self._create_module()
+        self.module: GasHFM | GasHFMX | LiquidHFM | LiquidHFMX = self._create_module()
 
     # SECTION: Helper methods
     # NOTE: this method converts the solver state history to physical units for public outputs, especially for scaled models where the state variables are in a non-physical scaled form. It checks the reactor type and applies the appropriate unscaling logic to recover the physical values of flow rates, temperature, and pressure (if applicable) from the scaled state variables.
@@ -68,7 +68,7 @@ class HFM:
             raise ValueError(
                 "Expected state history with shape (n_states, n_points).")
 
-        if not isinstance(self.module, (GasHFMX)):
+        if not isinstance(self.module, (GasHFMX, LiquidHFMX)):
             return state_arr
 
         n_points = state_arr.shape[1]
@@ -76,7 +76,7 @@ class HFM:
         for j in range(n_points):
             y_scaled = state_arr[:, j]
 
-            if isinstance(self.module, GasHFMX):
+            if isinstance(self.module, (GasHFMX)):
                 f, temp, p_total = self.module._unscale_state(y_scaled)
                 y_parts = [f]
                 if self.module.heat_transfer_mode == "non-isothermal":
@@ -100,7 +100,7 @@ class HFM:
         return np.column_stack(physical_cols)
 
     # NOTE: this method creates the appropriate HFM module instance based on the specified phase and modeling type. It checks the combination of phase (gas or liquid) and modeling type (physical or scale) and instantiates the corresponding class (GasHFM, GasHFMX, LiquidHFM, or LiquidHFMX) with the necessary inputs. If the combination is not implemented, it raises a NotImplementedError.
-    def _create_module(self) -> GasHFM | GasHFMX:
+    def _create_module(self) -> GasHFM | GasHFMX | LiquidHFM | LiquidHFMX:
         if (
             self.phase == "gas" and
             self.modeling_type == "physical"
@@ -112,7 +112,7 @@ class HFM:
                 hfm_core=self.hfm_core,
                 component_key=cast(ComponentKey, self.component_key),
             )
-        if (
+        elif (
             self.phase == "gas" and
             self.modeling_type == "scale"
         ):
@@ -123,32 +123,38 @@ class HFM:
                 hfm_core=self.hfm_core,
                 component_key=cast(ComponentKey, self.component_key),
             )
-        # if self.phase == "liquid" and self.modeling_type == "physical":
-        #     return LiquidHFM(
-        #         components=self.components,
-        #         reaction_rates=self.reaction_rates,
-        #         thermo_source=self.thermo_source,
-        #         hfm_core=self.hfm_core,
-        #         component_key=cast(ComponentKey, self.component_key),
-        #     )
-        # if self.phase == "liquid" and self.modeling_type == "scale":
-        #     return LiquidHFMX(
-        #         components=self.components,
-        #         reaction_rates=self.reaction_rates,
-        #         thermo_source=self.thermo_source,
-        #         hfm_core=self.hfm_core,
-        #         component_key=cast(ComponentKey, self.component_key),
-        #     )
-
-        raise NotImplementedError(
-            f"PFR reactor for phase '{self.phase}' and modeling_type '{self.modeling_type}' is not implemented yet."
-        )
+        elif (
+            self.phase == "liquid" and
+            self.modeling_type == "physical"
+        ):
+            return LiquidHFM(
+                components=self.components,
+                reaction_rates=self.reaction_rates,
+                thermo_source=self.thermo_source,
+                hfm_core=self.hfm_core,
+                component_key=cast(ComponentKey, self.component_key),
+            )
+        elif (
+            self.phase == "liquid" and
+            self.modeling_type == "scale"
+        ):
+            return LiquidHFMX(
+                components=self.components,
+                reaction_rates=self.reaction_rates,
+                thermo_source=self.thermo_source,
+                hfm_core=self.hfm_core,
+                component_key=cast(ComponentKey, self.component_key),
+            )
+        else:
+            raise NotImplementedError(
+                f"Module for phase '{self.phase}' and modeling_type '{self.modeling_type}' is not implemented yet."
+            )
 
     # SECTION: Simulation method
     @measure_time
     def simulate(
         self,
-        volume_span: tuple[float, float],
+        length_span: tuple[float, float],
         solver_options: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> Optional[MembraneResult]:
@@ -157,8 +163,8 @@ class HFM:
 
         Parameters
         ----------
-        volume_span : tuple[float, float]
-            The start and end volume for the simulation.
+        length_span : tuple[float, float]
+            The start and end length (z) for the simulation.
         solver_options : Optional[Dict[str, Any]], optional
             A dictionary of solver options to pass to `scipy.integrate.solve_ivp`. If None, default options will be used.
             Supported options include:
@@ -174,8 +180,8 @@ class HFM:
 
         Returns
         -------
-        Optional[PFRReactorResult]
-            The result of the simulation, including volume, state, success flag, and message.
+        Optional[MembraneResult]
+            The result of the simulation, including span, state, success flag, and message.
 
         Notes
         -----
@@ -219,7 +225,7 @@ class HFM:
         # NOTE: run ODE solver
         sol = solve_ivp(
             fun,
-            volume_span,
+            length_span,
             y0,
             **configured_solver_options,
         )
@@ -230,7 +236,7 @@ class HFM:
             return None
 
         return MembraneResult(
-            volume=sol.t,
+            span=sol.t,
             state=self._state_to_physical(sol.y),
             success=sol.success,
             message=sol.message,

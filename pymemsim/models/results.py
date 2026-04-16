@@ -4,11 +4,11 @@ from typing import Any, Dict, Literal, Optional
 
 
 class MembraneResult(BaseModel):
-    """Container for PFR reactor simulation outputs."""
+    """Container for membrane simulation outputs."""
 
-    volume: Any = Field(
+    span: Any = Field(
         ...,
-        description="Reactor-volume coordinate points returned by the ODE solver."
+        description="Span coordinate points returned by the ODE solver."
     )
     state: Any = Field(
         ...,
@@ -25,7 +25,7 @@ class MembraneResult(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "volume": self.volume,
+            "span": self.span,
             "state": self.state,
             "success": self.success,
             "message": self.message,
