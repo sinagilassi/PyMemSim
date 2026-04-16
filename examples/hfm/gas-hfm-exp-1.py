@@ -1,16 +1,16 @@
 # import packages/modules
+import logging
+import sys
+import warnings
+from pathlib import Path
+from pythermodb_settings.models import CustomProp, Temperature
+from rich import print
+# ! locals
 from examples.plot.plot_res import plot_hfm_result
 from examples.source.gas_model_source_exp_1 import components, model_source
 from pymemsim.thermo import build_thermo_source
 from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
 from pymemsim import HFM, create_hfm_module
-import logging
-import sys
-import warnings
-from pathlib import Path
-
-from rich import print
-from pythermodb_settings.models import CustomProp, Temperature
 
 # NOTE: example source and kinetics
 # ! add project root and examples root to import path for standalone script execution

@@ -4,6 +4,7 @@
         "hfmc",
         "HFMM",
         "HFMX",
-        "Matplotlib"
+        "Matplotlib",
+        "pymemsim"
     ]
 }
