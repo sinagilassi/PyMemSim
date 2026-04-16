@@ -5,11 +5,11 @@ from typing import Any, Dict, Optional, cast
 from pythermodb_settings.models import ComponentKey
 from pythermodb_settings.utils import measure_time
 # locals
+from ..core.hfmc import HFMCore
 from ..core.gas_hfm import GasHFM
-from ..core.gas_hfmx import GasHFM
+from ..core.gas_hfmx import GasHFMX
 from ..core.liquid_hfm import LiquidHFM
 from ..core.liquid_hfmx import LiquidHFMX
-from ..core.hfmc import HFMCore
 from ..models.hfm import HollowFiberMembraneOptions
 from ..models.results import MembraneResult
 from ..sources.thermo_source import ThermoSource
@@ -19,9 +19,9 @@ from ..utils.tools import configure_solver_options
 logger = logging.getLogger(__name__)
 
 
-class PFRReactor:
+class HFM:
     """
-    PFR reactor interface.
+    Hollow Fiber Membrane (HFM) module class for simulating hollow fiber membrane processes based on provided model inputs and thermodynamic data.
     """
 
     def __init__(
@@ -37,26 +37,28 @@ class PFRReactor:
         self.component_refs = thermo_source.component_refs
         self.component_key = thermo_source.component_key
 
-        self.pfr_reactor_options = cast(
-            PFRReactorOptions,
-            thermo_source.reactor_options
+        self.unit_options = cast(
+            HollowFiberMembraneOptions,
+            thermo_source.unit_options
         )
         self.heat_transfer_options = thermo_source.heat_transfer_options
-        self.phase = self.pfr_reactor_options.phase
-        self.modeling_type = self.pfr_reactor_options.modeling_type
+        self.phase = self.unit_options.phase
+        self.modeling_type = self.unit_options.modeling_type
         self.reaction_rates = thermo_source.reaction_rates
 
-        self.pfr_reactor_core = PFRReactorCore(
+        self.hfm_core = HFMCore(
             components=self.components,
             model_inputs=model_inputs,
-            pfr_reactor_options=self.pfr_reactor_options,
+            unit_options=self.unit_options,
             heat_transfer_options=self.heat_transfer_options,
             component_refs=self.component_refs,
             component_key=cast(ComponentKey, self.component_key),
         )
 
-        self.reactor: GasPFRReactor | GasPFRReactorX | LiquidPFRReactor | LiquidPFRReactorX = self._create_reactor()
+        self.module: GasHFM | GasHFMX = self._create_module()
 
+    # SECTION: Helper methods
+    # NOTE: this method converts the solver state history to physical units for public outputs, especially for scaled models where the state variables are in a non-physical scaled form. It checks the reactor type and applies the appropriate unscaling logic to recover the physical values of flow rates, temperature, and pressure (if applicable) from the scaled state variables.
     def _state_to_physical(self, state: np.ndarray) -> np.ndarray:
         """
         Convert solver state history to physical units for public outputs.
@@ -66,7 +68,7 @@ class PFRReactor:
             raise ValueError(
                 "Expected state history with shape (n_states, n_points).")
 
-        if not isinstance(self.reactor, (GasPFRReactorX, LiquidPFRReactorX)):
+        if not isinstance(self.module, (GasHFMX)):
             return state_arr
 
         n_points = state_arr.shape[1]
@@ -74,21 +76,21 @@ class PFRReactor:
         for j in range(n_points):
             y_scaled = state_arr[:, j]
 
-            if isinstance(self.reactor, GasPFRReactorX):
-                f, temp, p_total = self.reactor._unscale_state(y_scaled)
+            if isinstance(self.module, GasHFMX):
+                f, temp, p_total = self.module._unscale_state(y_scaled)
                 y_parts = [f]
-                if self.reactor.heat_transfer_mode == "non-isothermal":
+                if self.module.heat_transfer_mode == "non-isothermal":
                     y_parts.append(np.array([temp], dtype=float))
-                if self.reactor.pressure_mode == "state_variable":
+                if self.module.pressure_mode == "state_variable":
                     if p_total is None:
                         raise ValueError(
                             "Scaled gas PFR state_variable pressure could not be recovered."
                         )
                     y_parts.append(np.array([float(p_total)], dtype=float))
             else:
-                f, temp = self.reactor._unscale_state(y_scaled)
+                f, temp = self.module._unscale_state(y_scaled)
                 y_parts = [f]
-                if self.reactor.heat_transfer_mode == "non-isothermal":
+                if self.module.heat_transfer_mode == "non-isothermal":
                     y_parts.append(np.array([temp], dtype=float))
 
             y_physical = y_parts[0] if len(
@@ -97,39 +99,40 @@ class PFRReactor:
 
         return np.column_stack(physical_cols)
 
-    def _create_reactor(self) -> GasPFRReactor | GasPFRReactorX | LiquidPFRReactor | LiquidPFRReactorX:
+    # NOTE: this method creates the appropriate HFM module instance based on the specified phase and modeling type. It checks the combination of phase (gas or liquid) and modeling type (physical or scale) and instantiates the corresponding class (GasHFM, GasHFMX, LiquidHFM, or LiquidHFMX) with the necessary inputs. If the combination is not implemented, it raises a NotImplementedError.
+    def _create_module(self) -> GasHFM | GasHFMX:
         if self.phase == "gas" and self.modeling_type == "physical":
-            return GasPFRReactor(
+            return GasHFM(
                 components=self.components,
                 reaction_rates=self.reaction_rates,
                 thermo_source=self.thermo_source,
-                pfr_reactor_core=self.pfr_reactor_core,
+                hfm_core=self.hfm_core,
                 component_key=cast(ComponentKey, self.component_key),
             )
         if self.phase == "gas" and self.modeling_type == "scale":
-            return GasPFRReactorX(
+            return GasHFMX(
                 components=self.components,
                 reaction_rates=self.reaction_rates,
                 thermo_source=self.thermo_source,
-                pfr_reactor_core=self.pfr_reactor_core,
+                hfm_core=self.hfm_core,
                 component_key=cast(ComponentKey, self.component_key),
             )
-        if self.phase == "liquid" and self.modeling_type == "physical":
-            return LiquidPFRReactor(
-                components=self.components,
-                reaction_rates=self.reaction_rates,
-                thermo_source=self.thermo_source,
-                pfr_reactor_core=self.pfr_reactor_core,
-                component_key=cast(ComponentKey, self.component_key),
-            )
-        if self.phase == "liquid" and self.modeling_type == "scale":
-            return LiquidPFRReactorX(
-                components=self.components,
-                reaction_rates=self.reaction_rates,
-                thermo_source=self.thermo_source,
-                pfr_reactor_core=self.pfr_reactor_core,
-                component_key=cast(ComponentKey, self.component_key),
-            )
+        # if self.phase == "liquid" and self.modeling_type == "physical":
+        #     return LiquidHFM(
+        #         components=self.components,
+        #         reaction_rates=self.reaction_rates,
+        #         thermo_source=self.thermo_source,
+        #         hfm_core=self.hfm_core,
+        #         component_key=cast(ComponentKey, self.component_key),
+        #     )
+        # if self.phase == "liquid" and self.modeling_type == "scale":
+        #     return LiquidHFMX(
+        #         components=self.components,
+        #         reaction_rates=self.reaction_rates,
+        #         thermo_source=self.thermo_source,
+        #         hfm_core=self.hfm_core,
+        #         component_key=cast(ComponentKey, self.component_key),
+        #     )
 
         raise NotImplementedError(
             f"PFR reactor for phase '{self.phase}' and modeling_type '{self.modeling_type}' is not implemented yet."
@@ -142,14 +145,14 @@ class PFRReactor:
         volume_span: tuple[float, float],
         solver_options: Optional[Dict[str, Any]] = None,
         **kwargs,
-    ) -> Optional[PFRReactorResult]:
+    ) -> Optional[MembraneResult]:
         """
-        Run PFR simulation over the specified volume span with given solver options.
+        Run simulation over the specified volume span with given solver options.
 
         Parameters
         ----------
         volume_span : tuple[float, float]
-            The start and end volume for the PFR simulation.
+            The start and end volume for the simulation.
         solver_options : Optional[Dict[str, Any]], optional
             A dictionary of solver options to pass to `scipy.integrate.solve_ivp`. If None, default options will be used.
             Supported options include:
@@ -166,11 +169,11 @@ class PFRReactor:
         Returns
         -------
         Optional[PFRReactorResult]
-            The result of the PFR simulation, including volume, state, success flag, and message.
+            The result of the simulation, including volume, state, success flag, and message.
 
         Notes
         -----
-        - The method uses `scipy.integrate.solve_ivp` to solve the ODEs defined by the PFR reactor model.
+        - The method uses `scipy.integrate.solve_ivp` to solve the ODEs defined by the model.
         - The `mode` keyword argument can be used to control how the execution time is logged:
             - 'silent': No logging of execution time.
             - 'log': Logs the execution time to the logger.
@@ -188,23 +191,23 @@ class PFRReactor:
         # NOTE: define ODE function for PFR simulation
 
         def fun(V, y):
-            if isinstance(self.reactor, (GasPFRReactorX, LiquidPFRReactorX)):
-                return self.reactor.rhs_scaled(V, y)
-            elif isinstance(self.reactor, (GasPFRReactor, LiquidPFRReactor)):
-                return self.reactor.rhs(V, y)
+            if isinstance(self.module, (GasHFMX, LiquidHFMX)):
+                return self.module.rhs_scaled(V, y)
+            elif isinstance(self.module, (GasHFM, LiquidHFM)):
+                return self.module.rhs(V, y)
             else:
                 raise NotImplementedError(
-                    f"ODE function for reactor type '{type(self.reactor)}' is not implemented yet."
+                    f"ODE function for reactor type '{type(self.module)}' is not implemented yet."
                 )
 
         # NOTE: build initial condition vector
-        if isinstance(self.reactor, (GasPFRReactorX, LiquidPFRReactorX)):
-            y0 = self.reactor.build_y0_scaled()
-        elif isinstance(self.reactor, (GasPFRReactor, LiquidPFRReactor)):
-            y0 = self.reactor.build_y0()
+        if isinstance(self.module, (GasHFMX, LiquidHFMX)):
+            y0 = self.module.build_y0_scaled()
+        elif isinstance(self.module, (GasHFM, LiquidHFM)):
+            y0 = self.module.build_y0()
         else:
             raise NotImplementedError(
-                f"Initial condition builder for reactor type '{type(self.reactor)}' is not implemented yet."
+                f"Initial condition builder for reactor type '{type(self.module)}' is not implemented yet."
             )
 
         # NOTE: run ODE solver
@@ -220,7 +223,7 @@ class PFRReactor:
             logger.error(f"PFR ODE solver failed: {sol.message}")
             return None
 
-        return PFRReactorResult(
+        return MembraneResult(
             volume=sol.t,
             state=self._state_to_physical(sol.y),
             success=sol.success,

@@ -114,6 +114,11 @@ class GasHFMX(GasHFM):
         if self.heat_transfer_mode == "non-isothermal":
             y_parts.append(np.array([temp], dtype=float))
         if self.pressure_mode == "state_variable":
+            # NOTE: p_total should not be None here since _unscale_state would raise if it couldn't recover pressure.
+            if p_total is None:
+                raise ValueError(
+                    "Scaled gas PFR state_variable pressure could not be recovered."
+                )
             y_parts.append(np.array([float(p_total)], dtype=float))
         y_physical = y_parts[0] if len(
             y_parts) == 1 else np.concatenate(y_parts)
