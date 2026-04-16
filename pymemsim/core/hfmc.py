@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from pythermodb_settings.models import Component, ComponentKey, Temperature
 # locals
 from ..models.heat import HeatTransferOptions
-from ..utils.unit_tools import to_K, to_Pa, to_W_per_m2_K
+from ..utils.unit_tools import to_W_per_m2_K
 from .mc import MembraneCore
 from ..models.hfm import HollowFiberMembraneOptions
 
@@ -29,6 +29,7 @@ class HFMCore(MembraneCore):
         component_refs: Dict[str, Any],
         component_key: ComponentKey,
     ):
+        # SECTION: base initialization
         super().__init__(
             components=components,
             model_inputs=model_inputs,
@@ -54,6 +55,7 @@ class HFMCore(MembraneCore):
             )
 
         # SECTION: side-specific inlet states with backward compatibility keys
+        # ! feed-side inlet flows [mol/s]
         (
             self.feed_inlet_flows_comp,
             self.feed_inlet_flows,
@@ -65,6 +67,7 @@ class HFMCore(MembraneCore):
             default_component_value=0.0,
         )
 
+        # ! permeate-side inlet flows [mol/s]
         (
             self.permeate_inlet_flows_comp,
             self.permeate_inlet_flows,
@@ -76,12 +79,14 @@ class HFMCore(MembraneCore):
             default_component_value=0.0,
         )
 
+        # ! feed-side inlet temperature [K]
         self.feed_inlet_temperature = self._config_side_temperature(
             primary_key="feed_inlet_temperature",
             fallback_key="inlet_temperature",
             required=True,
             fallback_value_K=None,
         )
+        # ! permeate-side inlet temperature [K]
         self.permeate_inlet_temperature = self._config_side_temperature(
             primary_key="permeate_inlet_temperature",
             fallback_key=None,
@@ -89,12 +94,14 @@ class HFMCore(MembraneCore):
             fallback_value_K=float(self.feed_inlet_temperature.value),
         )
 
+        # ! feed-side pressure [Pa]
         self.feed_pressure = self._config_side_pressure(
             primary_key="feed_pressure",
             fallback_key="inlet_pressure",
             required=True,
             fallback_value_Pa=None,
         )
+        # ! permeate-side pressure [Pa]
         self.permeate_pressure = self._config_side_pressure(
             primary_key="permeate_pressure",
             fallback_key=None,
@@ -103,24 +110,30 @@ class HFMCore(MembraneCore):
         )
 
         # SECTION: membrane transport and thermal parameters
+        # ! membrane area per unit length [m] (= m2/m)
         self.membrane_area_per_length = self._config_membrane_area_per_length()
+        # ! overall heat-transfer coefficient [W/m2.K]
         self.overall_heat_transfer_coefficient = self._config_optional_per_area_u(
             key="overall_heat_transfer_coefficient",
             default_value=0.0
         )
+        # ! feed-side external heat flux [W/m2]
         self.q_ext_feed = self._config_optional_qext(
             key="q_ext_feed",
             default_value=0.0
         )
+        # ! permeate-side external heat flux [W/m2]
         self.q_ext_permeate = self._config_optional_qext(
             key="q_ext_permeate",
             default_value=0.0
         )
 
+        # ! gas transport coefficients aligned with component order
         self.gas_transport_coefficients = self._config_transport_coefficients(
             key="gas_transport_coefficients",
             required=(self.phase == "gas")
         )
+        # ! liquid transport coefficients aligned with component order
         self.liquid_transport_coefficients = self._config_transport_coefficients(
             key="liquid_transport_coefficients",
             required=(self.phase == "liquid")
@@ -138,9 +151,12 @@ class HFMCore(MembraneCore):
         # NOTE: thermal flags
         self.is_non_isothermal = self.heat_transfer_mode == "non-isothermal"
 
+        # SECTION: final validation
         self.config_model()
 
+    # SECTION: model validation
     def config_model(self):
+        # NOTE: geometric and pressure sanity checks
         if self.membrane_area_per_length <= 0.0:
             raise ValueError(
                 "membrane_area_per_length must be positive."
@@ -158,6 +174,7 @@ class HFMCore(MembraneCore):
         required: bool,
         default_component_value: float
     ):
+        # NOTE: prefer explicit side key, fallback to legacy key if provided.
         if primary_key in self.model_inputs_keys:
             return self.config_inlet_mole_flows_by_key(
                 key=primary_key,
@@ -176,6 +193,7 @@ class HFMCore(MembraneCore):
             default_component_value=default_component_value
         )
 
+    # NOTE: configure side temperature with backward-compatible fallback.
     def _config_side_temperature(
         self,
         primary_key: str,
@@ -183,12 +201,21 @@ class HFMCore(MembraneCore):
         required: bool,
         fallback_value_K: float | None,
     ) -> Temperature:
+        # ! direct side key
         if primary_key in self.model_inputs_keys:
-            return self._parse_temperature(self.model_inputs[primary_key], key=primary_key)
+            return Temperature(
+                value=self._to_temperature_K(self.model_inputs[primary_key], default_unit="K"),
+                unit="K"
+            )
 
+        # ! legacy fallback key
         if fallback_key is not None and fallback_key in self.model_inputs_keys:
-            return self._parse_temperature(self.model_inputs[fallback_key], key=fallback_key)
+            return Temperature(
+                value=self._to_temperature_K(self.model_inputs[fallback_key], default_unit="K"),
+                unit="K"
+            )
 
+        # ! missing-key behavior
         if required:
             raise ValueError(
                 f"'{primary_key}' must be provided in model_inputs."
@@ -199,6 +226,7 @@ class HFMCore(MembraneCore):
             )
         return Temperature(value=float(fallback_value_K), unit="K")
 
+    # NOTE: configure side pressure with backward-compatible fallback.
     def _config_side_pressure(
         self,
         primary_key: str,
@@ -206,12 +234,15 @@ class HFMCore(MembraneCore):
         required: bool,
         fallback_value_Pa: float | None,
     ) -> float:
+        # ! direct side key
         if primary_key in self.model_inputs_keys:
-            return self._parse_pressure(self.model_inputs[primary_key], key=primary_key)
+            return self._to_pressure_Pa(self.model_inputs[primary_key], default_unit="Pa")
 
+        # ! legacy fallback key
         if fallback_key is not None and fallback_key in self.model_inputs_keys:
-            return self._parse_pressure(self.model_inputs[fallback_key], key=fallback_key)
+            return self._to_pressure_Pa(self.model_inputs[fallback_key], default_unit="Pa")
 
+        # ! missing-key behavior
         if required:
             raise ValueError(
                 f"'{primary_key}' must be provided in model_inputs."
@@ -222,43 +253,8 @@ class HFMCore(MembraneCore):
             )
         return float(fallback_value_Pa)
 
-    def _parse_temperature(self, value: Any, key: str) -> Temperature:
-        if isinstance(value, Temperature):
-            raw_value = float(value.value)
-            raw_unit = value.unit
-        elif isinstance(value, Mapping):
-            if "value" not in value:
-                raise ValueError(f"'{key}' mapping must contain 'value'.")
-            raw_value = float(value["value"])
-            raw_unit = str(value.get("unit", "K"))
-        elif hasattr(value, "value"):
-            raw_value = float(value.value)
-            raw_unit = str(getattr(value, "unit", "K"))
-        else:
-            raw_value = float(value)
-            raw_unit = "K"
-
-        unit = str(raw_unit).strip() or "K"
-        if unit.upper() != "K":
-            raw_value = to_K(value=raw_value, unit=unit)
-        return Temperature(value=float(raw_value), unit="K")
-
-    def _parse_pressure(self, value: Any, key: str) -> float:
-        if isinstance(value, Mapping):
-            if "value" not in value:
-                raise ValueError(f"'{key}' mapping must contain 'value'.")
-            raw_value = float(value["value"])
-            raw_unit = str(value.get("unit", "Pa"))
-        elif hasattr(value, "value"):
-            raw_value = float(value.value)
-            raw_unit = str(getattr(value, "unit", "Pa"))
-        else:
-            raw_value = float(value)
-            raw_unit = "Pa"
-
-        unit = str(raw_unit).strip() or "Pa"
-        return float(to_Pa(value=raw_value, unit=unit))
-
+    # SECTION: membrane parameter configuration
+    # NOTE: configure membrane area-per-length (SI-equivalent units only).
     def _config_membrane_area_per_length(self) -> float:
         key = "membrane_area_per_length"
         if key not in self.model_inputs_keys:
@@ -267,19 +263,22 @@ class HFMCore(MembraneCore):
             )
 
         raw = self.model_inputs[key]
+        # ! pydantic-like object with .value/.unit
         if hasattr(raw, "value"):
             value = float(raw.value)
             unit = str(getattr(raw, "unit", "")).strip()
+        # ! mapping input {'value', 'unit'}
         elif isinstance(raw, Mapping):
             if "value" not in raw:
                 raise ValueError("membrane_area_per_length mapping must contain 'value'.")
             value = float(raw["value"])
             unit = str(raw.get("unit", "")).strip()
+        # ! bare numeric (assumed SI-equivalent)
         else:
             value = float(raw)
             unit = ""
 
-        # area-per-length has SI unit m (equivalent to m2/m).
+        # NOTE: area-per-length has SI unit m (equivalent to m2/m).
         if unit in ("", "m", "m2/m", "m^2/m"):
             return value
 
@@ -287,21 +286,26 @@ class HFMCore(MembraneCore):
             "Unsupported unit for membrane_area_per_length. Use SI-equivalent units: 'm' or 'm2/m'."
         )
 
+    # NOTE: configure optional overall heat-transfer coefficient [W/m2.K].
     def _config_optional_per_area_u(self, key: str, default_value: float) -> float:
         if key not in self.model_inputs_keys:
             return float(default_value)
         raw = self.model_inputs[key]
+        # ! pydantic-like object with .value/.unit
         if hasattr(raw, "value"):
             value = float(raw.value)
             unit = str(getattr(raw, "unit", "W/m2.K")).strip() or "W/m2.K"
+        # ! mapping input {'value', 'unit'}
         elif isinstance(raw, Mapping):
             value = float(raw.get("value", default_value))
             unit = str(raw.get("unit", "W/m2.K")).strip() or "W/m2.K"
+        # ! bare numeric (assumed W/m2.K)
         else:
             value = float(raw)
             unit = "W/m2.K"
         return float(to_W_per_m2_K(value=value, unit=unit))
 
+    # NOTE: configure optional side external heat flux [W/m2].
     def _config_optional_qext(self, key: str, default_value: float) -> float:
         """
         Configure side external heat flux [W/m2].
@@ -311,12 +315,15 @@ class HFMCore(MembraneCore):
         if key not in self.model_inputs_keys:
             return float(default_value)
         raw = self.model_inputs[key]
+        # ! pydantic-like object with .value/.unit
         if hasattr(raw, "value"):
             value = float(raw.value)
             unit = str(getattr(raw, "unit", "W/m2")).strip() or "W/m2"
+        # ! mapping input {'value', 'unit'}
         elif isinstance(raw, Mapping):
             value = float(raw.get("value", default_value))
             unit = str(raw.get("unit", "W/m2")).strip() or "W/m2"
+        # ! bare numeric (assumed W/m2)
         else:
             value = float(raw)
             unit = "W/m2"
@@ -328,6 +335,7 @@ class HFMCore(MembraneCore):
             f"Unsupported unit '{unit}' for {key}. Use 'W/m2'."
         )
 
+    # NOTE: configure component-wise transport coefficients in component order.
     def _config_transport_coefficients(self, key: str, required: bool) -> np.ndarray:
         if key not in self.model_inputs_keys:
             if required:
@@ -342,6 +350,7 @@ class HFMCore(MembraneCore):
                 f"'{key}' must be a mapping of component ids to coefficient values."
             )
 
+        # NOTE: build ordered coefficient array according to component_formula_state
         coeffs: List[float] = []
         missing: List[str] = []
         for comp_id in self.component_formula_state:
@@ -351,24 +360,29 @@ class HFMCore(MembraneCore):
                 continue
 
             item = raw[comp_id]
+            # ! pydantic-like object with .value
             if hasattr(item, "value"):
                 value = float(item.value)
+            # ! mapping input {'value', ...}
             elif isinstance(item, Mapping):
                 if "value" not in item:
                     raise ValueError(
                         f"Transport coefficient for '{comp_id}' in '{key}' must contain 'value'."
                     )
                 value = float(item["value"])
+            # ! bare numeric
             else:
                 value = float(item)
 
             coeffs.append(value)
 
+        # NOTE: enforce completeness only when required for active phase
         if required and len(missing) > 0:
             raise ValueError(
                 f"Missing transport coefficients in '{key}' for components: {missing}"
             )
 
+        # NOTE: final non-negativity check
         coeffs_np = np.array(coeffs, dtype=float)
         if np.any(coeffs_np < 0.0):
             raise ValueError(f"Transport coefficients in '{key}' must be non-negative.")

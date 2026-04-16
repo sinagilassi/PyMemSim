@@ -7,6 +7,9 @@ from .hfm import HollowFiberMembraneOptions
 # NOTE: heat
 from .heat import HeatTransferOptions
 
+# NOTE: results
+from .results import MembraneResult
+
 __all__ = [
     # ref
     "MembraneOptions",
@@ -15,5 +18,7 @@ __all__ = [
     # hfm
     "HollowFiberMembraneOptions",
     # heat
-    "HeatTransferOptions"
+    "HeatTransferOptions",
+    # results
+    "MembraneResult",
 ]

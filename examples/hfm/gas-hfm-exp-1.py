@@ -11,14 +11,14 @@ import pyThermoLinkDB as ptdblink
 from pythermodb_settings.models import CustomProp, Temperature, Volume
 
 # locals
-from pymemsim import PFRReactor, create_pfr_reactor
-from pymemsim.models import HeatTransferOptions, PFRReactorOptions
+from pymemsim import HFM, create_hfm_module
+from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
 from pymemsim.thermo import build_thermo_source
 
 # NOTE: example-specific imports
 # from examples.source.gas_model_source_exp_1 import model_source
-from examples.rates.rate_exp_2 import components, reaction_rates, model_source
-from examples.plot.plot_res import plot_pfr_reactor_result
+from examples.source.gas_load_model_source import model_source
+# plot
 
 # NOTE: example source and kinetics
 # ! add project root and examples root to import path for standalone script execution
@@ -35,7 +35,7 @@ print(ptdblink.__version__)
 # NOTE: silence library warnings/errors for this example run
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
-for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pymemsim", "pyreactlab_core"):
+for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pyreactlab_core"):
     logging.getLogger(logger_name).setLevel(logging.CRITICAL + 1)
 
 # ====================================================

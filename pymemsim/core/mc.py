@@ -96,6 +96,24 @@ class MembraneCore:
             return float(raw_value)
         return to_mol_per_s(value=raw_value, unit=unit)
 
+    def _to_temperature_K(self, value: Any, default_unit: str = "K") -> float:
+        """
+        Convert supported scalar/model/mapping input to temperature in Kelvin.
+        """
+        raw_value, raw_unit = self._extract_value_unit(value)
+        unit = raw_unit.strip() or default_unit
+        if unit.upper() == "K":
+            return float(raw_value)
+        return float(to_K(value=raw_value, unit=unit))
+
+    def _to_pressure_Pa(self, value: Any, default_unit: str = "Pa") -> float:
+        """
+        Convert supported scalar/model/mapping input to pressure in Pascal.
+        """
+        raw_value, raw_unit = self._extract_value_unit(value)
+        unit = raw_unit.strip() or default_unit
+        return float(to_Pa(value=raw_value, unit=unit))
+
     # SECTION: Model Inputs configuration
     # NOTE: is isothermal
     @property
