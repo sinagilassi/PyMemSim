@@ -1,4 +1,9 @@
 # import packages/modules
+from examples.plot.plot_res import plot_hfm_result
+from examples.source.gas_model_source_exp_1 import components, model_source
+from pymemsim.thermo import build_thermo_source
+from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
+from pymemsim import HFM, create_hfm_module
 import logging
 import sys
 import warnings
@@ -14,14 +19,6 @@ EXAMPLES_DIR = Path(__file__).resolve().parents[1]
 for path in (PROJECT_DIR, EXAMPLES_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
-
-# locals
-from pymemsim import HFM, create_hfm_module
-from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
-from pymemsim.thermo import build_thermo_source
-
-from examples.source.gas_model_source_exp_1 import components, model_source
-from examples.plot.plot_res import plot_hfm_result
 
 
 # NOTE: silence library warnings/errors for this example run

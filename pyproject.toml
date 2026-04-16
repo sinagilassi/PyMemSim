@@ -39,8 +39,8 @@ dependencies = [
     "pythermolinkdb>=1.4.14",
     "pythermodb-settings>=0.2.10",
     "pythermocalcdb>=0.10.0",
-    "matplotlib>=3.10.8",
     "pyreactsim-core>=0.1.0",
+    "matplotlib>=3.10.8",
 ]
 
 [project.urls]
