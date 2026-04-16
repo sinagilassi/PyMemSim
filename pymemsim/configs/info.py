@@ -2,7 +2,7 @@
 # --------------
 
 # package name
-__package__ = 'PyMemSim'
+__package__ = 'pymemsim'
 # version
 __version__ = '0.1.0'
 # description

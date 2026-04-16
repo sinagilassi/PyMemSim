@@ -5,9 +5,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union, TypeAlias
 from pythermodb_settings.models import Component, ComponentKey
 from pyreactlab_core.models.reaction import Reaction
 from pyreactlab_core import build_rxns_stoichiometry
+from pyreactsim_core.models.rate_exp import ReactionRateExpression
 # locals
-from ..models.rate_exp import ReactionRateExpression
-from ..models import ReactorPhase
 
 # NOTE: set logger
 logger = logging.getLogger(__name__)
