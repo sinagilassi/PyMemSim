@@ -101,7 +101,10 @@ class HFM:
 
     # NOTE: this method creates the appropriate HFM module instance based on the specified phase and modeling type. It checks the combination of phase (gas or liquid) and modeling type (physical or scale) and instantiates the corresponding class (GasHFM, GasHFMX, LiquidHFM, or LiquidHFMX) with the necessary inputs. If the combination is not implemented, it raises a NotImplementedError.
     def _create_module(self) -> GasHFM | GasHFMX:
-        if self.phase == "gas" and self.modeling_type == "physical":
+        if (
+            self.phase == "gas" and
+            self.modeling_type == "physical"
+        ):
             return GasHFM(
                 components=self.components,
                 reaction_rates=self.reaction_rates,
@@ -109,7 +112,10 @@ class HFM:
                 hfm_core=self.hfm_core,
                 component_key=cast(ComponentKey, self.component_key),
             )
-        if self.phase == "gas" and self.modeling_type == "scale":
+        if (
+            self.phase == "gas" and
+            self.modeling_type == "scale"
+        ):
             return GasHFMX(
                 components=self.components,
                 reaction_rates=self.reaction_rates,
