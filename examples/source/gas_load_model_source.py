@@ -93,6 +93,27 @@ C2H6 = Component(
     state='g',
 )
 
+# methane
+CH4 = Component(
+    name='methane',
+    formula='CH4',
+    state='g',
+)
+
+# nitrogen
+N2 = Component(
+    name='nitrogen',
+    formula='N2',
+    state='g',
+)
+
+# propane
+C3H8 = Component(
+    name='propane',
+    formula='C3H8',
+    state='g',
+)
+
 # components
 # components = [CO2, H2, CH3OH, H2O]
 
@@ -120,6 +141,26 @@ H2O_thermodb_file = os.path.join(
 CO_thermodb_file = os.path.join(
     thermodb_dir,
     'carbon monoxide.pkl'
+)
+CH4_thermodb_file = os.path.join(
+    thermodb_dir,
+    'methane.pkl'
+)
+C2H4_thermodb_file = os.path.join(
+    thermodb_dir,
+    'ethylene.pkl'
+)
+C2H6_thermodb_file = os.path.join(
+    thermodb_dir,
+    'ethane.pkl'
+)
+C3H8_thermodb_file = os.path.join(
+    thermodb_dir,
+    'propane.pkl'
+)
+N2_thermodb_file = os.path.join(
+    thermodb_dir,
+    'nitrogen.pkl'
 )
 
 # =======================================
@@ -151,6 +192,31 @@ CO_thermodb: ComponentThermoDBSource = ComponentThermoDBSource(
     source=CO_thermodb_file
 )
 
+CH4_thermodb: ComponentThermoDBSource = ComponentThermoDBSource(
+    component=CH4,
+    source=CH4_thermodb_file
+)
+
+C2H4_thermodb: ComponentThermoDBSource = ComponentThermoDBSource(
+    component=C2H4,
+    source=C2H4_thermodb_file
+)
+
+C2H6_thermodb: ComponentThermoDBSource = ComponentThermoDBSource(
+    component=C2H6,
+    source=C2H6_thermodb_file
+)
+
+C3H8_thermodb: ComponentThermoDBSource = ComponentThermoDBSource(
+    component=C3H8,
+    source=C3H8_thermodb_file
+)
+
+N2_thermodb: ComponentThermoDBSource = ComponentThermoDBSource(
+    component=N2,
+    source=N2_thermodb_file
+)
+
 # NOTE: load and build model source
 # NOTE: debug timing for model source build
 _build_t0 = time.perf_counter()
@@ -179,10 +245,7 @@ _build_t0 = time.perf_counter()
 model_source: ModelSource = load_and_build_model_source(
     thermodb_sources=[
         CO2_thermodb,
-        H2_thermodb,
-        CH3OH_thermodb,
-        H2O_thermodb,
-        CO_thermodb
+        N2_thermodb,
     ],
     original_equation_label=False
 )

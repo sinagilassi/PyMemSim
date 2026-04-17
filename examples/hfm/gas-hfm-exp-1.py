@@ -7,7 +7,7 @@ from pythermodb_settings.models import CustomProp, Temperature
 from rich import print
 # ! locals
 from examples.plot.plot_res import plot_hfm_result
-from examples.source.gas_model_source_exp_1 import components, model_source
+from examples.source.gas_load_model_source import model_source, CO2, N2
 from pymemsim.thermo import build_thermo_source
 from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
 from pymemsim import HFM, create_hfm_module
@@ -27,6 +27,11 @@ logger = logging.getLogger(__name__)
 for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pymemsim", "pyreactlab_core"):
     logging.getLogger(logger_name).setLevel(logging.CRITICAL + 1)
 
+
+# ====================================================
+# SECTION: Define components
+# ====================================================
+components = [CO2, N2]
 
 # ====================================================
 # SECTION: Inputs
@@ -57,40 +62,31 @@ thermo_inputs = {}
 # SECTION: Model Inputs
 # ====================================================
 feed_inlet_flows = {
-    "CO-g": CustomProp(value=0.00, unit="mol/s"),
-    "H2-g": CustomProp(value=0.15, unit="mol/s"),
-    "CH3OH-g": CustomProp(value=0.00, unit="mol/s"),
-    "H2O-g": CustomProp(value=0.00, unit="mol/s"),
-    "CO2-g": CustomProp(value=0.05, unit="mol/s"),
+    "CO2-g": CustomProp(value=12, unit="mol/s"),
+    "N2-g": CustomProp(value=18, unit="mol/s"),
 }
 
 permeate_inlet_flows = {
-    "CO-g": CustomProp(value=0.00, unit="mol/s"),
-    "H2-g": CustomProp(value=0.00, unit="mol/s"),
-    "CH3OH-g": CustomProp(value=0.00, unit="mol/s"),
-    "H2O-g": CustomProp(value=0.00, unit="mol/s"),
     "CO2-g": CustomProp(value=0.00, unit="mol/s"),
+    "N2-g": CustomProp(value=0.00, unit="mol/s"),
 }
 
-# NOTE: gas transport coefficients Pi_i [placeholder units expected by model]
+# NOTE: gas transport coefficients Pi_i (permeances) for each component i, in units of m3/s.m2.Pa
 gas_transport_coefficients = {
-    "CO-g": CustomProp(value=1.0e-9, unit=""),
-    "H2-g": CustomProp(value=1.0e-8, unit=""),
-    "CH3OH-g": CustomProp(value=5.0e-10, unit=""),
-    "H2O-g": CustomProp(value=5.0e-10, unit=""),
-    "CO2-g": CustomProp(value=2.0e-9, unit=""),
+    "CO2-g": CustomProp(value=4.77E-10, unit="m3/s.m2.Pa"),
+    "N2-g": CustomProp(value=2.29E-11, unit="m3/s.m2.Pa"),
 }
 
 model_inputs = {
     # NOTE: dual-side inlet specs
     "feed_inlet_flows": feed_inlet_flows,
     "permeate_inlet_flows": permeate_inlet_flows,
-    "feed_inlet_temperature": Temperature(value=330.0, unit="K"),
-    "permeate_inlet_temperature": Temperature(value=300.0, unit="K"),
-    "feed_pressure": CustomProp(value=50.0, unit="bar"),
-    "permeate_pressure": CustomProp(value=1.0, unit="bar"),
+    "feed_inlet_temperature": Temperature(value=298.0, unit="K"),
+    "permeate_inlet_temperature": Temperature(value=298.0, unit="K"),
+    "feed_pressure": CustomProp(value=404, unit="kPa"),
+    "permeate_pressure": CustomProp(value=101, unit="kPa"),
     # NOTE: membrane parameters
-    "membrane_area_per_length": CustomProp(value=10.0, unit="m"),
+    "membrane_area_per_length": CustomProp(value=0.05058, unit="m2/m"),
     "overall_heat_transfer_coefficient": CustomProp(value=20.0, unit="W/m2.K"),
     "q_ext_feed": CustomProp(value=0.0, unit="W/m2"),
     "q_ext_permeate": CustomProp(value=0.0, unit="W/m2"),
@@ -126,7 +122,7 @@ print("[bold green]HFM module successfully created![/bold green]")
 # ====================================================
 # SECTION: Simulate
 # ====================================================
-length_span = (0.0, 1.0)  # [m]
+length_span = (0.0, 0.63)  # [m]
 
 simulation_results: MembraneResult | None = hfm_module.simulate(
     length_span=length_span,
