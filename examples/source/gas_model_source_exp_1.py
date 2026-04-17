@@ -85,8 +85,29 @@ C2H6 = Component(
     state='g',
 )
 
+# methane
+CH4 = Component(
+    name='methane',
+    formula='CH4',
+    state='g',
+)
+
+# nitrogen
+N2 = Component(
+    name='nitrogen',
+    formula='N2',
+    state='g',
+)
+
+# propane
+C3H8 = Component(
+    name='propane',
+    formula='C3H8',
+    state='g',
+)
+
 # components
-components = [CO, H2, CH3OH, H2O, CO2]
+components = [CH4, N2, C2H6, C3H8]
 
 # NOTE: ignore state properties
 ignore_state_props = ['MW', 'VaPr', 'Cp_IG']
