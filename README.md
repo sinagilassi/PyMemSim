@@ -1,46 +1,57 @@
-# PyMemLab
+# PyMemSim
 
-![PyMemLab](https://drive.google.com/uc?export=view&id=1PCmloxGYElTfuxIVDTV9Objt6cucJ3KC)
+![PyMemSim](https://drive.google.com/uc?export=view&id=1PCmloxGYElTfuxIVDTV9Objt6cucJ3KC)
 
-![Downloads](https://img.shields.io/pypi/dm/PyMemLab) ![PyPI](https://img.shields.io/pypi/v/PyMemLab) ![Python Version](https://img.shields.io/pypi/pyversions/PyMemLab.svg) ![License](https://img.shields.io/pypi/l/PyMemLab) ![Read the Docs](https://img.shields.io/readthedocs/PyMemLab)
+![Downloads](https://img.shields.io/pypi/dm/PyMemSim) ![PyPI](https://img.shields.io/pypi/v/PyMemSim) ![Python Version](https://img.shields.io/pypi/pyversions/PyMemSim.svg) ![License](https://img.shields.io/pypi/l/PyMemSim) ![Read the Docs](https://img.shields.io/readthedocs/PyMemSim)
 
-**PyMemLab** is a versatile and extensible Python package designed for engineers, researchers, and scientists working in the field of membrane separations. It provides a laboratory-like environment where users can model membrane transport, simulate separation processes, and perform parametric studies or process optimization.
+**PyMemSim** is a Python package for membrane-process simulation, with a current focus on hollow-fiber membrane (HFM) models.
 
-Whether you're designing new membrane modules, evaluating separation performance, or testing novel materials, **PyMemLab** offers the computational tools to support your work.
+## Package Functionalities
 
-## 📚 Scientific Basis
+Current capabilities include:
 
-This package is based on the modeling approach presented in the article:
+- Hollow-fiber membrane simulation through the `HFM` interface and `create_hfm_module(...)` factory.
+- Gas-phase and liquid-phase HFM modeling.
+- `physical` and `scale` modeling modes.
+- Isothermal and non-isothermal simulation setup.
+- Dual-side inlet specification (feed/permeate flows, temperatures, pressures).
+- Constant-pressure operation for feed and permeate sides.
+- Component-wise transport coefficients for gas and liquid systems.
+- Solver-based simulation (`scipy.integrate.solve_ivp`) with configurable solver options.
 
-**Gilassi, Sina, Seyed Mohammad Taghavi, Denis Rodrigue, and Serge Kaliaguine. "Simulation of gas separation using partial element stage cut modeling of hollow fiber membrane modules." AIChE Journal 64, no. 5 (2018): 1766-1777.**
+## Installation
 
-[https://doi.org/10.1002/aic.16044](https://doi.org/10.1002/aic.16044)
+Install from PyPI:
 
-This methodology allows accurate simulation of gas separation performance across hollow fiber membrane modules by considering differential elements and stage cut variations. PyMemLab implements this approach in a flexible computational framework.
-
-## 🚀 Key Features
-
-- **Permeation modeling** for gaseous mixtures.
-- Support for different **membrane configurations** (co-current, counter-current, and cross-flow).
-- **Process optimization** capabilities.
-- Easy integration with **NumPy**, **SciPy**, **Pandas**, and **Matplotlib** for data handling and visualization.
-
-## 📥 Installation
-
-Install PyMemLab with pip:
-
-```python
-import PyMemLab as pml
-# check version
-print(pml.__version__)
+```bash
+pip install PyMemSim
 ```
 
-## 🌡️ Usage Examples
+Quick version check:
 
-## 📝 License
+```python
+import pymemsim as pms
+print(pms.__version__)
+```
+
+## Usage Examples
+
+For a complete end-to-end setup (thermo source, options, model inputs, module creation, and simulation), see:
+
+- `examples/hfm/gas-hfm-exp-1.py`
+
+You can also review:
+
+- `examples/hfm/liquid-hfm-exp-1.py`
+
+## Development Status
+
+PyMemSim is under active development. APIs, model options, and behaviors may change in future releases.
+
+## License
 
 This project is licensed under the MIT License. You are free to use, modify, and distribute this software in your own applications or projects. However, if you choose to use this app in another app or software, please ensure that my name, Sina Gilassi, remains credited as the original author. This includes retaining any references to the original repository or documentation where applicable. By doing so, you help acknowledge the effort and time invested in creating this project.
 
-## ❓ FAQ
+## FAQ
 
 For any question, contact me on [LinkedIn](https://www.linkedin.com/in/sina-gilassi/)
