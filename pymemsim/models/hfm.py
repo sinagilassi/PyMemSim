@@ -15,6 +15,8 @@ class HollowFiberMembraneOptions(MembraneOptions):
     ----------
     modeling_type : Literal['physical', 'scale']
         Modeling type as physical or scale. The physical model solves ODE states in physical units, while the scale model solves scaled state variables.
+    flow_mode : Literal['co-current', 'counter-current']
+        Flow mode as co-current or counter-current. The co-current flow mode considers feed and permeate flow in the same direction, while the counter-current flow mode considers feed and permeate flow in opposite directions.
     feed_pressure_mode : Optional[Literal['constant', 'state_variable']]
         Pressure mode as constant and state_variable. The state_variable considers pressure as a variable computes the pressure drop along the unit.
     permeate_pressure_mode : Optional[Literal['constant', 'state_variable']]
@@ -39,6 +41,10 @@ class HollowFiberMembraneOptions(MembraneOptions):
     modeling_type: Literal['physical', 'scale'] = Field(
         default="physical",
         description="Modeling type as physical or scale. The physical model solves ODE states in physical units, while the scale model solves scaled state variables."
+    )
+    flow_mode: Literal['co-current', 'counter-current'] = Field(
+        default="co-current",
+        description="Flow mode as co-current or counter-current. The co-current flow mode considers feed and permeate flow in the same direction, while the counter-current flow mode considers feed and permeate flow in opposite directions."
     )
     feed_pressure_mode: Optional[Literal["constant", "state_variable"]] = Field(
         default="constant",
