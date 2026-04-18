@@ -182,7 +182,7 @@ class GasHFM:
         dF_rxn_f = self._build_reaction_source_feed(rates=rates_f)
 
         # NOTE: Fluxes J_i = Pi_i * (y_f_i P_f - y_p_i P_p)
-        # ! [mol/s]
+        # ! [mol/m2.s]
         J = self._calc_fluxes(Ff=Ff, Fp=Fp)
 
         # NOTE: Material balances
@@ -221,6 +221,22 @@ class GasHFM:
         J_i = Pi_i * (y_f_i P_f - y_p_i P_p)
 
         where y_f_i and y_p_i are the feed and permeate mole fractions calculated from the current flows.
+
+        Parameters
+        ----------
+        Ff : np.ndarray
+            Current feed-side molar flow vector [mol/s].
+        Fp : np.ndarray
+            Current permeate-side molar flow vector [mol/s].
+
+        Returns
+        -------
+        np.ndarray
+            Flux vector for each component i [mol/m2.s].
+
+        Notes
+        -----
+        Gas transport coefficient Pi_i is given in units of mol/m2.s.Pa, so the resulting flux is in mol/m2.s.
         """
         Ff_total = max(float(np.sum(Ff)), 1e-30)
         Fp_total = max(float(np.sum(Fp)), 1e-30)

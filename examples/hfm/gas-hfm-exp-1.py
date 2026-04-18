@@ -11,6 +11,7 @@ from examples.source.gas_load_model_source import model_source, CO2, N2
 from pymemsim.thermo import build_thermo_source
 from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
 from pymemsim import HFM, create_hfm_module
+from pymemsim.utils import analyze_hfm_result, print_hfm_result_tables
 
 # NOTE: example source and kinetics
 # ! add project root and examples root to import path for standalone script execution
@@ -62,8 +63,8 @@ thermo_inputs = {}
 # SECTION: Model Inputs
 # ====================================================
 feed_inlet_flows = {
-    "CO2-g": CustomProp(value=12, unit="mol/s"),
-    "N2-g": CustomProp(value=18, unit="mol/s"),
+    "CO2-g": CustomProp(value=0.00067, unit="mol/s"),
+    "N2-g": CustomProp(value=0.001, unit="mol/s"),
 }
 
 permeate_inlet_flows = {
@@ -71,10 +72,10 @@ permeate_inlet_flows = {
     "N2-g": CustomProp(value=0.00, unit="mol/s"),
 }
 
-# NOTE: gas transport coefficients Pi_i (permeances) for each component i, in units of m3/s.m2.Pa
+# NOTE: gas transport coefficients Pi_i (Permeance) for each component i, in units of mol/s.m2.Pa
 gas_transport_coefficients = {
-    "CO2-g": CustomProp(value=4.77E-10, unit="m3/s.m2.Pa"),
-    "N2-g": CustomProp(value=2.29E-11, unit="m3/s.m2.Pa"),
+    "CO2-g": CustomProp(value=63.6*3.35e-10, unit="mol/s.m2.Pa"),
+    "N2-g": CustomProp(value=3.05*3.35e-10, unit="mol/s.m2.Pa"),
 }
 
 model_inputs = {
@@ -140,9 +141,15 @@ if simulation_results is not None:
     print("message:", simulation_results.message)
     print("span points:", len(simulation_results.span))
     print("state shape:", simulation_results.state.shape)
-    plot_hfm_result(
+    analysis = analyze_hfm_result(
         result=simulation_results,
-        components=components,
-        show=True,
-        title_prefix="Gas HFM",
+        hfm_module=hfm_module,
+        target_component="CO2-g",
     )
+    print_hfm_result_tables(analysis)
+    # plot_hfm_result(
+    #     result=simulation_results,
+    #     components=components,
+    #     show=True,
+    #     title_prefix="Gas HFM",
+    # )
