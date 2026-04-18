@@ -43,6 +43,9 @@ class GasHFM:
         # NOTE: flow pattern setup
         self.s_p = hfm_core.permeate_axial_sign
 
+        # NOTE: aux parameters
+        self.ns = len(components)  # number of species/components
+
         # NOTE: Normalized dual-side membrane inputs
         # ! feed inlet flows [mol/s]
         self.Ff_in = hfm_core.feed_inlet_flows.astype(float)
@@ -124,10 +127,23 @@ class GasHFM:
         return np.concatenate(y0_parts)
 
     # ! boundary conditions for BVP solver
-    def bc(self):
-        """
-        Boundary conditions for BVP solver."""
-        pass
+    def bc(self, ya, yb):
+        # ya = y(z=0)
+        # yb = y(z=L)
+
+        res = []
+
+        # Feed at z=0
+        res.extend(ya[:self.ns] - self.Ff_in)
+
+        # Permeate at z=L
+        res.extend(yb[self.ns:2*self.ns] - self.Fp_in)
+
+        if self.heat_transfer_mode == "non-isothermal":
+            res.append(ya[Tf_idx] - self.Tf_in)
+            res.append(yb[Tp_idx] - self.Tp_in)
+
+        return np.array(res)
 
     # ! build mesh
     def build_mesh(self):
