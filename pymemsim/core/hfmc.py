@@ -40,9 +40,13 @@ class HFMCore(MembraneCore):
 
         # SECTION: core options
         self.phase = unit_options.phase
-        self.operation_mode = getattr(unit_options, "operation_mode", "constant_pressure")
-        self.feed_pressure_mode = getattr(unit_options, "feed_pressure_mode", "constant")
-        self.permeate_pressure_mode = getattr(unit_options, "permeate_pressure_mode", "constant")
+        self.flow_pattern = unit_options.flow_pattern
+        self.operation_mode = getattr(
+            unit_options, "operation_mode", "constant_pressure")
+        self.feed_pressure_mode = getattr(
+            unit_options, "feed_pressure_mode", "constant")
+        self.permeate_pressure_mode = getattr(
+            unit_options, "permeate_pressure_mode", "constant")
         self.gas_model = unit_options.gas_model
         self.gas_heat_capacity_mode = unit_options.gas_heat_capacity_mode
         self.liquid_heat_capacity_mode = unit_options.liquid_heat_capacity_mode
@@ -154,6 +158,19 @@ class HFMCore(MembraneCore):
         # SECTION: final validation
         self.config_model()
 
+    # SECTION: Property accessors for public outputs
+    @property
+    def is_counter_current(self) -> bool:
+        return self.flow_pattern == "counter-current"
+
+    @property
+    def is_co_current(self) -> bool:
+        return self.flow_pattern == "co-current"
+
+    @property
+    def permeate_axial_sign(self) -> int:
+        return -1 if self.is_counter_current else 1
+
     # SECTION: model validation
     def config_model(self):
         # NOTE: geometric and pressure sanity checks
@@ -204,14 +221,16 @@ class HFMCore(MembraneCore):
         # ! direct side key
         if primary_key in self.model_inputs_keys:
             return Temperature(
-                value=self._to_temperature_K(self.model_inputs[primary_key], default_unit="K"),
+                value=self._to_temperature_K(
+                    self.model_inputs[primary_key], default_unit="K"),
                 unit="K"
             )
 
         # ! legacy fallback key
         if fallback_key is not None and fallback_key in self.model_inputs_keys:
             return Temperature(
-                value=self._to_temperature_K(self.model_inputs[fallback_key], default_unit="K"),
+                value=self._to_temperature_K(
+                    self.model_inputs[fallback_key], default_unit="K"),
                 unit="K"
             )
 
@@ -270,7 +289,8 @@ class HFMCore(MembraneCore):
         # ! mapping input {'value', 'unit'}
         elif isinstance(raw, Mapping):
             if "value" not in raw:
-                raise ValueError("membrane_area_per_length mapping must contain 'value'.")
+                raise ValueError(
+                    "membrane_area_per_length mapping must contain 'value'.")
             value = float(raw["value"])
             unit = str(raw.get("unit", "")).strip()
         # ! bare numeric (assumed SI-equivalent)
@@ -385,5 +405,6 @@ class HFMCore(MembraneCore):
         # NOTE: final non-negativity check
         coeffs_np = np.array(coeffs, dtype=float)
         if np.any(coeffs_np < 0.0):
-            raise ValueError(f"Transport coefficients in '{key}' must be non-negative.")
+            raise ValueError(
+                f"Transport coefficients in '{key}' must be non-negative.")
         return coeffs_np

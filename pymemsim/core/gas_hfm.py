@@ -40,6 +40,9 @@ class GasHFM:
         self.heat_transfer_mode = hfm_core.heat_transfer_mode
         self.gas_model = hfm_core.gas_model
 
+        # NOTE: flow pattern setup
+        self.s_p = hfm_core.permeate_axial_sign
+
         # NOTE: Normalized dual-side membrane inputs
         # ! feed inlet flows [mol/s]
         self.Ff_in = hfm_core.feed_inlet_flows.astype(float)
@@ -120,6 +123,26 @@ class GasHFM:
             y0_parts.append(np.array([self.Tf_in, self.Tp_in], dtype=float))
         return np.concatenate(y0_parts)
 
+    # ! boundary conditions for BVP solver
+    def bc(self):
+        """
+        Boundary conditions for BVP solver."""
+        pass
+
+    # ! build mesh
+    def build_mesh(self):
+        """
+        Build mesh for BVP solver.
+        """
+        pass
+
+    # ! build initial guess for BVP solver
+    def build_initial_guess(self):
+        """
+        Build initial guess for BVP solver.
+        """
+        pass
+
     # SECTION: ODE RHS builder
     def rhs(self, z: float, y: np.ndarray) -> np.ndarray:
         ns = self.component_num
@@ -190,7 +213,9 @@ class GasHFM:
         dFf_dz = -self.a_m * J + dF_rxn_f
 
         # ! permeate side: dFp_i/dz = +a_m * J_i
-        dFp_dz = +self.a_m * J
+        # ? for co-current flow, the permeate axial sign is positive where as
+        # ? for counter-current flow, the permeate axial sign is negative.
+        dFp_dz = self.s_p * self.a_m * J
 
         # >> Combine derivatives
         out = np.concatenate([dFf_dz, dFp_dz])
@@ -352,6 +377,8 @@ class GasHFM:
             cp_flow_f + q_rxn_f / cp_flow_f
 
         # ! permeate side [K/m]
-        dTp_dz = self.a_m * (+q_cond + self.q_ext_p) / cp_flow_p
+        # ? for co-current flow, the conductive heat transfer term is negative where as
+        # ? for counter-current flow, the conductive heat transfer term is positive.
+        dTp_dz = self.a_m * (self.s_p * q_cond + self.q_ext_p) / cp_flow_p
 
         return float(dTf_dz), float(dTp_dz)

@@ -1,6 +1,6 @@
 import logging
 import numpy as np
-from scipy.integrate import solve_ivp
+from scipy.integrate import solve_ivp, solve_bvp
 from typing import Any, Dict, Optional, cast
 from pythermodb_settings.models import ComponentKey
 from pythermodb_settings.utils import measure_time
