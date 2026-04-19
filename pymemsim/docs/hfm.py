@@ -55,6 +55,7 @@ class HFM:
             component_key=cast(ComponentKey, self.component_key),
         )
 
+        # NOTE: create HFM module
         self.module: GasHFM | GasHFMX | LiquidHFM | LiquidHFMX = self._create_module()
 
     # SECTION: Helper methods
@@ -199,8 +200,10 @@ class HFM:
                 length_span=length_span,
                 solver_options=solver_options,
             )
-        raise ValueError(f"Unsupported flow_pattern '{self.hfm_core.flow_pattern}'.")
+        raise ValueError(
+            f"Unsupported flow_pattern '{self.hfm_core.flow_pattern}'.")
 
+    # ! define the ODE function for the solver
     def _rhs_point(self, z: float, y: np.ndarray) -> np.ndarray:
         if isinstance(self.module, (GasHFMX, LiquidHFMX)):
             return self.module.rhs_scaled(z, y)
@@ -210,15 +213,18 @@ class HFM:
             f"ODE function for reactor type '{type(self.module)}' is not implemented yet."
         )
 
+    # NOTE: simulate co-current flow by solving an initial value problem (IVP)
     def _simulate_cocurrent(
         self,
         length_span: tuple[float, float],
         solver_options: Optional[Dict[str, Any]] = None,
     ) -> Optional[MembraneResult]:
+        # configure solver options with defaults
         configured_solver_options = configure_solver_options(
             solver_options=solver_options
         )
 
+        # build initial condition vector y0 based on the module type
         if isinstance(self.module, (GasHFMX, LiquidHFMX)):
             y0 = self.module.build_y0_scaled()
         elif isinstance(self.module, (GasHFM, LiquidHFM)):
@@ -228,6 +234,7 @@ class HFM:
                 f"Initial condition builder for reactor type '{type(self.module)}' is not implemented yet."
             )
 
+        # solve the IVP using scipy's solve_ivp
         sol = solve_ivp(
             self._rhs_point,
             length_span,
@@ -235,10 +242,12 @@ class HFM:
             **configured_solver_options,
         )
 
+        # check if the solver was successful and log an error if it failed
         if not sol.success:
             logger.error(f"HFM co-current IVP solver failed: {sol.message}")
             return None
 
+        # convert the solver state history to physical units and return the result
         return MembraneResult(
             span=sol.t,
             state=self._state_to_physical(sol.y),
@@ -246,17 +255,20 @@ class HFM:
             message=sol.message,
         )
 
+    # NOTE: simulate counter-current flow by solving a boundary value problem (BVP)
     def _simulate_countercurrent(
         self,
         length_span: tuple[float, float],
         solver_options: Optional[Dict[str, Any]] = None,
     ) -> Optional[MembraneResult]:
+        # ! check if the module type supports counter-current simulation
         if not isinstance(self.module, (GasHFM, GasHFMX)):
             raise NotImplementedError(
                 "Counter-current simulation is implemented only for gas modules "
                 "(GasHFM and GasHFMX) in this release."
             )
 
+        # configure BVP solver options with defaults
         bvp_options = solver_options.copy() if solver_options is not None else {}
         mesh_points = int(bvp_options.pop("mesh_points", 80))
         tol = float(bvp_options.pop("tol", 1e-3))
@@ -265,16 +277,26 @@ class HFM:
         bc_tol = bvp_options.pop("bc_tol", None)
         debug_bc = bool(bvp_options.pop("debug_bc", False))
 
-        z_mesh = self.module.build_mesh(length_span=length_span, mesh_points=mesh_points)
+        # build the mesh
+        z_mesh = self.module.build_mesh(
+            length_span=length_span,
+            mesh_points=mesh_points
+        )
+
+        # build the initial guess
         y_guess = self.module.build_initial_guess(z_mesh)
+
+        # >> debug
         if debug_bc:
-            bc_guess = np.asarray(self.module.bc(y_guess[:, 0], y_guess[:, -1]), dtype=float)
+            bc_guess = np.asarray(self.module.bc(
+                y_guess[:, 0], y_guess[:, -1]), dtype=float)
             logger.info(
                 "HFM counter-current initial BC residual: norm_inf=%.3e norm_l2=%.3e",
                 float(np.max(np.abs(bc_guess))),
                 float(np.linalg.norm(bc_guess)),
             )
 
+        # ! define the ODE function for the BVP solver, which can handle both pointwise and vectorized inputs
         def fun(z: np.ndarray, y: np.ndarray) -> np.ndarray:
             z_arr = np.asarray(z, dtype=float)
             y_arr = np.asarray(y, dtype=float)
@@ -286,6 +308,7 @@ class HFM:
                 out[:, j] = self._rhs_point(float(z_arr[j]), y_arr[:, j])
             return out
 
+        # configure the BVP solver options and solve the BVP using scipy's solve_bvp
         solve_bvp_kwargs: Dict[str, Any] = {
             "tol": tol,
             "max_nodes": max_nodes,
@@ -294,6 +317,7 @@ class HFM:
         if bc_tol is not None:
             solve_bvp_kwargs["bc_tol"] = float(bc_tol)
 
+        # run solver
         sol = solve_bvp(
             fun=fun,
             bc=self.module.bc,
