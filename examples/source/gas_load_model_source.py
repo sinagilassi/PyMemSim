@@ -246,6 +246,7 @@ model_source: ModelSource = load_and_build_model_source(
     thermodb_sources=[
         CO2_thermodb,
         N2_thermodb,
+        CH4_thermodb,
     ],
     original_equation_label=False
 )
