@@ -25,7 +25,11 @@ for path in (PROJECT_DIR, EXAMPLES_DIR):
 # NOTE: silence library warnings/errors for this example run
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
+SUPPRESS_PYMEMSIM_LOGS = False
 for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pymemsim", "pyreactlab_core"):
+    if logger_name == "pymemsim" and not SUPPRESS_PYMEMSIM_LOGS:
+        logging.getLogger(logger_name).setLevel(logging.INFO)
+        continue
     logging.getLogger(logger_name).setLevel(logging.CRITICAL + 1)
 
 
@@ -124,11 +128,13 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
         }
     else:
         solver_options = {
-            "mesh_points": 50,
-            "tol": 1e-5,
-            "max_nodes": 5000,
+            "mesh_points": 80,
+            "tol": 1e-3,
+            "max_nodes": 20000,
             "verbose": 0,
+            "debug_bc": True,
         }
+    print(f"[bold yellow]solver options ({flow_pattern}):[/bold yellow] {solver_options}")
 
     simulation_results: MembraneResult | None = hfm_module.simulate(
         length_span=length_span,
@@ -160,5 +166,5 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
 length_span = (0.0, 0.63)  # [m]
 
 print("[bold green]Running gas HFM example for both flow patterns...[/bold green]")
-# run_case(flow_pattern="co-current", length_span=length_span)
+run_case(flow_pattern="co-current", length_span=length_span)
 run_case(flow_pattern="counter-current", length_span=length_span)

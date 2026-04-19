@@ -258,14 +258,22 @@ class HFM:
             )
 
         bvp_options = solver_options.copy() if solver_options is not None else {}
-        mesh_points = int(bvp_options.pop("mesh_points", 50))
+        mesh_points = int(bvp_options.pop("mesh_points", 80))
         tol = float(bvp_options.pop("tol", 1e-3))
-        max_nodes = int(bvp_options.pop("max_nodes", 1000))
+        max_nodes = int(bvp_options.pop("max_nodes", 20000))
         verbose = int(bvp_options.pop("verbose", 0))
         bc_tol = bvp_options.pop("bc_tol", None)
+        debug_bc = bool(bvp_options.pop("debug_bc", False))
 
         z_mesh = self.module.build_mesh(length_span=length_span, mesh_points=mesh_points)
         y_guess = self.module.build_initial_guess(z_mesh)
+        if debug_bc:
+            bc_guess = np.asarray(self.module.bc(y_guess[:, 0], y_guess[:, -1]), dtype=float)
+            logger.info(
+                "HFM counter-current initial BC residual: norm_inf=%.3e norm_l2=%.3e",
+                float(np.max(np.abs(bc_guess))),
+                float(np.linalg.norm(bc_guess)),
+            )
 
         def fun(z: np.ndarray, y: np.ndarray) -> np.ndarray:
             z_arr = np.asarray(z, dtype=float)
@@ -295,7 +303,14 @@ class HFM:
         )
 
         if not sol.success:
-            logger.error(f"HFM counter-current BVP solver failed: {sol.message}")
+            logger.error(
+                "HFM counter-current BVP solver failed: status=%s message=%s nodes=%d tol=%.3e max_nodes=%d",
+                getattr(sol, "status", "n/a"),
+                sol.message,
+                len(sol.x),
+                tol,
+                max_nodes,
+            )
             return None
 
         return MembraneResult(

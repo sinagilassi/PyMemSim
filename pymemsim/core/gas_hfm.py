@@ -180,6 +180,11 @@ class GasHFM:
 
         n_points = z_mesh.size
         ns = self.component_num
+        z0 = float(z_mesh[0])
+        z1 = float(z_mesh[-1])
+        if z1 <= z0:
+            raise ValueError("z_mesh must be strictly increasing.")
+        eta = (z_mesh - z0) / (z1 - z0)
 
         # Feed guess: mild decrease from inlet to outlet.
         ff_out_guess = np.maximum(0.95 * self.Ff_in, 1e-12)
@@ -188,11 +193,14 @@ class GasHFM:
             for i in range(ns)
         ])
 
-        # Permeate guess: small positive near z=0, prescribed inlet at z=L.
-        fp_start_guess = np.maximum(0.05 * self.Fp_in, 1e-12)
+        # Permeate guess: positive floor at z=0, prescribed inlet at z=L.
+        # Use a mild curved blend to avoid steep profiles near the boundary.
+        ff_total_in = max(float(np.sum(self.Ff_in)), 1e-16)
+        fp_floor = max(1e-12, 1e-3 * ff_total_in / max(ns, 1))
+        fp_start_guess = np.maximum(np.where(self.Fp_in > 0.0, 0.2 * self.Fp_in, fp_floor), fp_floor)
+        blend = eta ** 1.5
         fp_guess = np.vstack([
-            np.linspace(float(fp_start_guess[i]), float(
-                self.Fp_in[i]), n_points)
+            (1.0 - blend) * float(fp_start_guess[i]) + blend * float(self.Fp_in[i])
             for i in range(ns)
         ])
 
@@ -442,8 +450,7 @@ class GasHFM:
             cp_flow_f + q_rxn_f / cp_flow_f
 
         # ! permeate side [K/m]
-        # ? for co-current flow, the conductive heat transfer term is negative where as
-        # ? for counter-current flow, the conductive heat transfer term is positive.
+        # NOTE: only conductive transfer changes orientation with flow pattern.
         dTp_dz = self.a_m * (self.s_p * q_cond + self.q_ext_p) / cp_flow_p
 
         return float(dTf_dz), float(dTp_dz)

@@ -70,6 +70,11 @@ class _DummyLiquid(LiquidHFM):
         self.Fp_in = np.array([0.0], dtype=float)
 
 
+class _ThermoStub:
+    def calc_Cp_IG(self, temperature):
+        return np.array([1.0, 1.0], dtype=float)
+
+
 def test_flow_pattern_aliases_normalize_to_canonical():
     assert HFMCore._normalize_flow_pattern("co-current") == "co-current"
     assert HFMCore._normalize_flow_pattern("counter-current") == "counter-current"
@@ -125,6 +130,51 @@ def test_countercurrent_liquid_guardrail():
 
     with _expect_raises(NotImplementedError, "only for gas modules"):
         hfm.simulate(length_span=(0.0, 1.0))
+
+
+def test_countercurrent_zero_permeate_guess_stays_positive_and_finite():
+    module = _DummyGasPhysical()
+    module.component_num = 2
+    module.ns = 2
+    module.Ff_in = np.array([0.8, 0.2], dtype=float)
+    module.Fp_in = np.array([0.0, 0.0], dtype=float)
+
+    z = np.linspace(0.0, 1.0, 40)
+    y_guess = module.build_initial_guess(z)
+    fp_guess = y_guess[module.ns:2 * module.ns, :]
+
+    assert np.all(np.isfinite(fp_guess))
+    assert np.all(fp_guess >= 0.0)
+    # positive away from z=L to keep mole-fraction denominators well conditioned
+    assert np.all(fp_guess[:, :-1] > 0.0)
+
+
+def test_countercurrent_permeate_energy_sign_changes_conduction_only():
+    module = GasHFM.__new__(GasHFM)
+    module.thermo_source = _ThermoStub()
+    module.a_m = 1.0
+    module.U_m = 2.0
+    module.q_ext_f = 0.0
+    module.q_ext_p = 1.0
+    module.s_p = -1
+
+    Ff = np.array([2.0, 1.0], dtype=float)
+    Fp = np.array([1.5, 0.5], dtype=float)
+    Tf = 320.0
+    Tp = 300.0
+    dTf_dz, dTp_dz = module._build_temperature_derivatives(
+        Ff=Ff,
+        Fp=Fp,
+        Tf=Tf,
+        Tp=Tp,
+        q_rxn_f=0.0,
+    )
+
+    cp_flow_p = float(np.sum(Fp))
+    q_cond = module.U_m * (Tf - Tp)
+    expected_dTp = module.a_m * (module.s_p * q_cond + module.q_ext_p) / cp_flow_p
+    assert abs(dTp_dz - expected_dTp) < 1e-12
+    assert np.isfinite(dTf_dz)
 
 
 class _expect_raises:
