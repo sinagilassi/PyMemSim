@@ -175,7 +175,8 @@ class GasHFM:
         """
         z_mesh = np.asarray(z_mesh, dtype=float)
         if z_mesh.ndim != 1 or z_mesh.size < 2:
-            raise ValueError("z_mesh must be a 1D array with at least two points.")
+            raise ValueError(
+                "z_mesh must be a 1D array with at least two points.")
 
         n_points = z_mesh.size
         ns = self.component_num
@@ -190,7 +191,8 @@ class GasHFM:
         # Permeate guess: small positive near z=0, prescribed inlet at z=L.
         fp_start_guess = np.maximum(0.05 * self.Fp_in, 1e-12)
         fp_guess = np.vstack([
-            np.linspace(float(fp_start_guess[i]), float(self.Fp_in[i]), n_points)
+            np.linspace(float(fp_start_guess[i]), float(
+                self.Fp_in[i]), n_points)
             for i in range(ns)
         ])
 
@@ -198,8 +200,10 @@ class GasHFM:
         if self.heat_transfer_mode == "non-isothermal":
             tf_out_guess = 0.99 * self.Tf_in + 0.01 * self.Tp_in
             tp_start_guess = 0.99 * self.Tp_in + 0.01 * self.Tf_in
-            tf_guess = np.linspace(self.Tf_in, tf_out_guess, n_points, dtype=float)
-            tp_guess = np.linspace(tp_start_guess, self.Tp_in, n_points, dtype=float)
+            tf_guess = np.linspace(
+                self.Tf_in, tf_out_guess, n_points, dtype=float)
+            tp_guess = np.linspace(
+                tp_start_guess, self.Tp_in, n_points, dtype=float)
             y_parts.append(np.vstack([tf_guess, tp_guess]))
 
         return np.vstack(y_parts)
