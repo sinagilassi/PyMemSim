@@ -1,6 +1,6 @@
 # import libs
-from pydantic import BaseModel, Field
-from typing import Any, Dict, Literal, Optional
+from pydantic import Field
+from typing import Literal, Optional
 # locals
 from .ref import GasModel, UnitPhase, MembraneOptions
 
@@ -15,8 +15,8 @@ class HollowFiberMembraneOptions(MembraneOptions):
     ----------
     modeling_type : Literal['physical', 'scale']
         Modeling type as physical or scale. The physical model solves ODE states in physical units, while the scale model solves scaled state variables.
-    flow_pattern : Literal['co-current', 'counter-current']
-        Flow pattern as co-current or counter-current. The co-current flow mode considers feed and permeate flow in the same direction, while the counter-current flow mode considers feed and permeate flow in opposite directions.
+    flow_pattern : Literal['co-current', 'counter-current', 'cocurrent', 'countercurrent']
+        Flow pattern as co-current/counter-current (canonical) or cocurrent/countercurrent (aliases).
     feed_pressure_mode : Optional[Literal['constant', 'state_variable']]
         Pressure mode as constant and state_variable. The state_variable considers pressure as a variable computes the pressure drop along the unit.
     permeate_pressure_mode : Optional[Literal['constant', 'state_variable']]
@@ -42,9 +42,12 @@ class HollowFiberMembraneOptions(MembraneOptions):
         default="physical",
         description="Modeling type as physical or scale. The physical model solves ODE states in physical units, while the scale model solves scaled state variables."
     )
-    flow_pattern: Literal['co-current', 'counter-current'] = Field(
+    flow_pattern: Literal['co-current', 'counter-current', 'cocurrent', 'countercurrent'] = Field(
         default="co-current",
-        description="Flow mode as co-current or counter-current. The co-current flow mode considers feed and permeate flow in the same direction, while the counter-current flow mode considers feed and permeate flow in opposite directions."
+        description=(
+            "Flow mode as co-current or counter-current. Alias forms "
+            "'cocurrent' and 'countercurrent' are also accepted."
+        )
     )
     feed_pressure_mode: Optional[Literal["constant", "state_variable"]] = Field(
         default="constant",
