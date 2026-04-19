@@ -153,20 +153,56 @@ class GasHFM:
         return np.concatenate([bc_feed, bc_permeate])
 
     # ! build mesh
-    def build_mesh(self):
+    def build_mesh(
+        self,
+        length_span: tuple[float, float],
+        mesh_points: int = 50,
+    ) -> np.ndarray:
         """
         Build mesh for BVP solver.
         """
-        # TODO: Consider mesh refinement
-        pass
+        z0, z1 = float(length_span[0]), float(length_span[1])
+        if z1 <= z0:
+            raise ValueError("length_span must satisfy z_end > z_start.")
+        if mesh_points < 5:
+            raise ValueError("mesh_points must be >= 5 for solve_bvp.")
+        return np.linspace(z0, z1, int(mesh_points), dtype=float)
 
     # ! build initial guess for BVP solver
-    def build_initial_guess(self):
+    def build_initial_guess(self, z_mesh: np.ndarray) -> np.ndarray:
         """
         Build initial guess for BVP solver.
         """
-        # TODO: Implement more informed initial guess
-        pass
+        z_mesh = np.asarray(z_mesh, dtype=float)
+        if z_mesh.ndim != 1 or z_mesh.size < 2:
+            raise ValueError("z_mesh must be a 1D array with at least two points.")
+
+        n_points = z_mesh.size
+        ns = self.component_num
+
+        # Feed guess: mild decrease from inlet to outlet.
+        ff_out_guess = np.maximum(0.95 * self.Ff_in, 1e-12)
+        ff_guess = np.vstack([
+            np.linspace(float(self.Ff_in[i]), float(ff_out_guess[i]), n_points)
+            for i in range(ns)
+        ])
+
+        # Permeate guess: small positive near z=0, prescribed inlet at z=L.
+        fp_start_guess = np.maximum(0.05 * self.Fp_in, 1e-12)
+        fp_guess = np.vstack([
+            np.linspace(float(fp_start_guess[i]), float(self.Fp_in[i]), n_points)
+            for i in range(ns)
+        ])
+
+        y_parts = [ff_guess, fp_guess]
+        if self.heat_transfer_mode == "non-isothermal":
+            tf_out_guess = 0.99 * self.Tf_in + 0.01 * self.Tp_in
+            tp_start_guess = 0.99 * self.Tp_in + 0.01 * self.Tf_in
+            tf_guess = np.linspace(self.Tf_in, tf_out_guess, n_points, dtype=float)
+            tp_guess = np.linspace(tp_start_guess, self.Tp_in, n_points, dtype=float)
+            y_parts.append(np.vstack([tf_guess, tp_guess]))
+
+        return np.vstack(y_parts)
 
     # SECTION: ODE RHS builder
     def rhs(self, z: float, y: np.ndarray) -> np.ndarray:

@@ -40,7 +40,7 @@ class HFMCore(MembraneCore):
 
         # SECTION: core options
         self.phase = unit_options.phase
-        self.flow_pattern = unit_options.flow_pattern
+        self.flow_pattern = self._normalize_flow_pattern(unit_options.flow_pattern)
         self.operation_mode = getattr(
             unit_options, "operation_mode", "constant_pressure")
         self.feed_pressure_mode = getattr(
@@ -170,6 +170,18 @@ class HFMCore(MembraneCore):
     @property
     def permeate_axial_sign(self) -> int:
         return -1 if self.is_counter_current else 1
+
+    @staticmethod
+    def _normalize_flow_pattern(flow_pattern: str) -> str:
+        normalized = flow_pattern.strip().lower().replace("-", "").replace("_", "")
+        if normalized == "cocurrent":
+            return "co-current"
+        if normalized == "countercurrent":
+            return "counter-current"
+        raise ValueError(
+            "Invalid flow_pattern. Supported values are "
+            "'co-current', 'counter-current', 'cocurrent', 'countercurrent'."
+        )
 
     # SECTION: model validation
     def config_model(self):

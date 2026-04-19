@@ -31,6 +31,34 @@ class GasHFMX(GasHFM):
             y0_parts.append(np.array([theta_f0, theta_p0], dtype=float))
         return np.concatenate(y0_parts)
 
+    def build_initial_guess(self, z_mesh: np.ndarray) -> np.ndarray:
+        y_guess_physical = super().build_initial_guess(z_mesh)
+
+        ns = self.component_num
+        y_guess_scaled = np.array(y_guess_physical, dtype=float, copy=True)
+        y_guess_scaled[:ns, :] = y_guess_physical[:ns, :] / self.Ff_scale[:, None]
+        y_guess_scaled[ns:2 * ns, :] = y_guess_physical[ns:2 * ns, :] / self.Fp_scale[:, None]
+
+        if self.heat_transfer_mode == "non-isothermal":
+            y_guess_scaled[2 * ns, :] = (y_guess_physical[2 * ns, :] - self.Tf_scale_ref) / self.T_scale
+            y_guess_scaled[2 * ns + 1, :] = (y_guess_physical[2 * ns + 1, :] - self.Tp_scale_ref) / self.T_scale
+
+        return y_guess_scaled
+
+    def bc(self, ya: np.ndarray, yb: np.ndarray) -> np.ndarray:
+        ns = self.ns
+        bc_feed = ya[:ns] - (self.Ff_in / self.Ff_scale)
+        bc_permeate = yb[ns:2 * ns] - (self.Fp_in / self.Fp_scale)
+
+        if self.heat_transfer_mode == "non-isothermal":
+            theta_f_in = (self.Tf_in - self.Tf_scale_ref) / self.T_scale
+            theta_p_in = (self.Tp_in - self.Tp_scale_ref) / self.T_scale
+            bc_tf = ya[2 * ns] - theta_f_in
+            bc_tp = yb[2 * ns + 1] - theta_p_in
+            return np.concatenate([bc_feed, bc_permeate, np.array([bc_tf, bc_tp], dtype=float)])
+
+        return np.concatenate([bc_feed, bc_permeate])
+
     def _unscale_state(self, y_scaled: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float, float]:
         ns = self.component_num
         idx = 2 * ns

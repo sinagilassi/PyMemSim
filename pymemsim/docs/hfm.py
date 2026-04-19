@@ -189,24 +189,36 @@ class HFM:
             - rtol: 1e-6
             - atol: 1e-9
         """
-        # NOTE: set default solver options if not provided
+        if self.hfm_core.is_co_current:
+            return self._simulate_cocurrent(
+                length_span=length_span,
+                solver_options=solver_options,
+            )
+        if self.hfm_core.is_counter_current:
+            return self._simulate_countercurrent(
+                length_span=length_span,
+                solver_options=solver_options,
+            )
+        raise ValueError(f"Unsupported flow_pattern '{self.hfm_core.flow_pattern}'.")
+
+    def _rhs_point(self, z: float, y: np.ndarray) -> np.ndarray:
+        if isinstance(self.module, (GasHFMX, LiquidHFMX)):
+            return self.module.rhs_scaled(z, y)
+        if isinstance(self.module, (GasHFM, LiquidHFM)):
+            return self.module.rhs(z, y)
+        raise NotImplementedError(
+            f"ODE function for reactor type '{type(self.module)}' is not implemented yet."
+        )
+
+    def _simulate_cocurrent(
+        self,
+        length_span: tuple[float, float],
+        solver_options: Optional[Dict[str, Any]] = None,
+    ) -> Optional[MembraneResult]:
         configured_solver_options = configure_solver_options(
             solver_options=solver_options
         )
 
-        # NOTE: define ODE function
-
-        def fun(V, y):
-            if isinstance(self.module, (GasHFMX, LiquidHFMX)):
-                return self.module.rhs_scaled(V, y)
-            elif isinstance(self.module, (GasHFM, LiquidHFM)):
-                return self.module.rhs(V, y)
-            else:
-                raise NotImplementedError(
-                    f"ODE function for reactor type '{type(self.module)}' is not implemented yet."
-                )
-
-        # NOTE: build initial condition vector
         if isinstance(self.module, (GasHFMX, LiquidHFMX)):
             y0 = self.module.build_y0_scaled()
         elif isinstance(self.module, (GasHFM, LiquidHFM)):
@@ -216,17 +228,15 @@ class HFM:
                 f"Initial condition builder for reactor type '{type(self.module)}' is not implemented yet."
             )
 
-        # NOTE: run ODE solver
         sol = solve_ivp(
-            fun,
+            self._rhs_point,
             length_span,
             y0,
             **configured_solver_options,
         )
 
-        # NOTE: check solver success and return results
         if not sol.success:
-            logger.error(f"PFR ODE solver failed: {sol.message}")
+            logger.error(f"HFM co-current IVP solver failed: {sol.message}")
             return None
 
         return MembraneResult(
@@ -236,12 +246,61 @@ class HFM:
             message=sol.message,
         )
 
-    def _simulate_cocurrent(self):
+    def _simulate_countercurrent(
+        self,
+        length_span: tuple[float, float],
+        solver_options: Optional[Dict[str, Any]] = None,
+    ) -> Optional[MembraneResult]:
+        if not isinstance(self.module, (GasHFM, GasHFMX)):
+            raise NotImplementedError(
+                "Counter-current simulation is implemented only for gas modules "
+                "(GasHFM and GasHFMX) in this release."
+            )
 
-        # NOTE: define ODE function for co-current simulation
-        pass
+        bvp_options = solver_options.copy() if solver_options is not None else {}
+        mesh_points = int(bvp_options.pop("mesh_points", 50))
+        tol = float(bvp_options.pop("tol", 1e-3))
+        max_nodes = int(bvp_options.pop("max_nodes", 1000))
+        verbose = int(bvp_options.pop("verbose", 0))
+        bc_tol = bvp_options.pop("bc_tol", None)
 
-    def _simulate_countercurrent(self):
+        z_mesh = self.module.build_mesh(length_span=length_span, mesh_points=mesh_points)
+        y_guess = self.module.build_initial_guess(z_mesh)
 
-        # NOTE: wrapper method for co-current simulation
-        pass
+        def fun(z: np.ndarray, y: np.ndarray) -> np.ndarray:
+            z_arr = np.asarray(z, dtype=float)
+            y_arr = np.asarray(y, dtype=float)
+            if y_arr.ndim == 1:
+                return self._rhs_point(float(z_arr), y_arr)
+
+            out = np.empty_like(y_arr)
+            for j in range(y_arr.shape[1]):
+                out[:, j] = self._rhs_point(float(z_arr[j]), y_arr[:, j])
+            return out
+
+        solve_bvp_kwargs: Dict[str, Any] = {
+            "tol": tol,
+            "max_nodes": max_nodes,
+            "verbose": verbose,
+        }
+        if bc_tol is not None:
+            solve_bvp_kwargs["bc_tol"] = float(bc_tol)
+
+        sol = solve_bvp(
+            fun=fun,
+            bc=self.module.bc,
+            x=z_mesh,
+            y=y_guess,
+            **solve_bvp_kwargs,
+        )
+
+        if not sol.success:
+            logger.error(f"HFM counter-current BVP solver failed: {sol.message}")
+            return None
+
+        return MembraneResult(
+            span=sol.x,
+            state=self._state_to_physical(sol.y),
+            success=sol.success,
+            message=sol.message,
+        )
