@@ -194,7 +194,7 @@ class HFM:
             solver_options=solver_options
         )
 
-        # NOTE: define ODE function for PFR simulation
+        # NOTE: define ODE function
 
         def fun(V, y):
             if isinstance(self.module, (GasHFMX, LiquidHFMX)):
@@ -235,3 +235,13 @@ class HFM:
             success=sol.success,
             message=sol.message,
         )
+
+    def _simulate_cocurrent(self):
+
+        # NOTE: define ODE function for co-current simulation
+        pass
+
+    def _simulate_countercurrent(self):
+
+        # NOTE: wrapper method for co-current simulation
+        pass
