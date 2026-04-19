@@ -191,18 +191,36 @@ def analyze_hfm_result(
 
     warnings: List[str] = []
 
+    flow_pattern = getattr(
+        getattr(hfm_module, "hfm_core", None),
+        "flow_pattern",
+        getattr(getattr(hfm_module, "unit_options", None), "flow_pattern", None),
+    )
+    normalized_flow_pattern = (
+        str(flow_pattern).strip().lower().replace("-", "").replace("_", "")
+        if flow_pattern is not None
+        else ""
+    )
+    s_p = float(getattr(module, "s_p", 1.0))
+    is_counter_current = (
+        normalized_flow_pattern == "countercurrent"
+        or (normalized_flow_pattern == "" and s_p < 0.0)
+    )
+    perm_in_idx = -1 if is_counter_current else 0
+    perm_out_idx = 0 if is_counter_current else -1
+
     Ff_in = Ff[:, 0]
     Ff_out = Ff[:, -1]
-    Fp_in = Fp[:, 0]
-    Fp_out = Fp[:, -1]
+    Fp_in = Fp[:, perm_in_idx]
+    Fp_out = Fp[:, perm_out_idx]
     Ff_in_total = float(Ff_total[0])
     Ff_out_total = float(Ff_total[-1])
-    Fp_in_total = float(Fp_total[0])
-    Fp_out_total = float(Fp_total[-1])
+    Fp_in_total = float(Fp_total[perm_in_idx])
+    Fp_out_total = float(Fp_total[perm_out_idx])
 
     yf_in = yf[:, 0]
     yf_out = yf[:, -1]
-    yp_out = yp[:, -1]
+    yp_out = yp[:, perm_out_idx]
 
     target_index = _resolve_target_index(
         target_component=target_component,
@@ -253,8 +271,8 @@ def analyze_hfm_result(
             )
             qf_in = float(qf_profile[0])
             qf_out = float(qf_profile[-1])
-            qp_in = float(qp_profile[0])
-            qp_out = float(qp_profile[-1])
+            qp_in = float(qp_profile[perm_in_idx])
+            qp_out = float(qp_profile[perm_out_idx])
     elif phase == "liquid":
         k_i = np.asarray(getattr(module, "k_i", np.zeros(ns, dtype=float)), dtype=float)
         operation_mode = str(getattr(module, "operation_mode", "constant_pressure"))
@@ -281,8 +299,8 @@ def analyze_hfm_result(
             )
             qf_in = float(qf_profile[0])
             qf_out = float(qf_profile[-1])
-            qp_in = float(qp_profile[0])
-            qp_out = float(qp_profile[-1])
+            qp_in = float(qp_profile[perm_in_idx])
+            qp_out = float(qp_profile[perm_out_idx])
 
             qf_safe = np.where(np.abs(qf_profile) > eps, qf_profile, 1.0)
             qp_safe = np.where(np.abs(qp_profile) > eps, qp_profile, 1.0)
@@ -303,7 +321,7 @@ def analyze_hfm_result(
         _warn_once(warnings, f"Unsupported phase '{phase}' for advanced post-analysis.")
 
     stage_cut_molar = _safe_ratio(
-        numerator=Fp_out_total,
+        numerator=max(Fp_out_total - Fp_in_total, 0.0),
         denominator=Ff_in_total,
         eps=eps,
         warnings=warnings,
@@ -312,12 +330,22 @@ def analyze_hfm_result(
     stage_cut_volumetric = None
     if qf_in is not None and qp_out is not None:
         stage_cut_volumetric = _safe_ratio(
-            numerator=float(qp_out),
+            numerator=max(float(qp_out) - float(qp_in or 0.0), 0.0),
             denominator=float(qf_in),
             eps=eps,
             warnings=warnings,
             warning_message="Stage-cut (volumetric) is undefined because feed inlet volumetric flow is near zero.",
         )
+
+    if hasattr(module, "Fp_scale"):
+        fp_scale = np.asarray(getattr(module, "Fp_scale"), dtype=float)
+        # smooth_floor at scaled permeate uses s=1e-12 in GasHFMX.
+        floor_est = float(np.log(2.0) * 1e-12 * np.sum(fp_scale))
+        if Fp_out_total <= 10.0 * floor_est:
+            _warn_once(
+                warnings,
+                "Permeate outlet flow is close to the numerical floor; stage-cut may be floor-dominated.",
+            )
 
     recoveries_permeate: Dict[str, Optional[float]] = {}
     retentions_retentate: Dict[str, Optional[float]] = {}
@@ -513,6 +541,7 @@ def analyze_hfm_result(
     return {
         "case_definition": {
             "phase": phase,
+            "flow_pattern": flow_pattern,
             "modeling_type": getattr(getattr(hfm_module, "unit_options", None), "modeling_type", None),
             "heat_transfer_mode": getattr(module, "heat_transfer_mode", None),
             "operation_mode": getattr(module, "operation_mode", None),
@@ -546,7 +575,7 @@ def analyze_hfm_result(
                 total_molar_flow=Fp_out_total,
                 component_flows=Fp_out,
                 composition=yp_out,
-                temperature_value=float(Tp_profile[-1]),
+                temperature_value=float(Tp_profile[perm_out_idx]),
                 pressure_value=float(Pp) if Pp is not None else None,
                 volumetric_flow=qp_out,
             ),
