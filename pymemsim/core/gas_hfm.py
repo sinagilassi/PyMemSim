@@ -131,20 +131,26 @@ class GasHFM:
         # ya = y(z=0)
         # yb = y(z=L)
 
-        res = []
+        # ns
+        ns = self.ns
 
         # Feed at z=0
-        res.extend(ya[:self.ns] - self.Ff_in)
+        bc_feed = ya[:ns] - self.Ff_in
 
         # Permeate at z=L
-        res.extend(yb[self.ns:2*self.ns] - self.Fp_in)
+        bc_permeate = yb[ns:2*ns] - self.Fp_in
 
-        # TODO: Consider enforcing temperature BCs for non-isothermal case (currently relying on initial guess to anchor temperatures)
-        # if self.heat_transfer_mode == "non-isothermal":
-        #     res.append(ya[Tf_idx] - self.Tf_in)
-        #     res.append(yb[Tp_idx] - self.Tp_in)
+        # NOTE: Add temperature BCs if non-isothermal
+        if self.heat_transfer_mode == "non-isothermal":
+            # Tf at z=0
+            bc_Tf = ya[2*ns] - self.Tf_in
 
-        return np.array(res)
+            # Tp at z=L
+            bc_Tp = yb[2*ns + 1] - self.Tp_in
+
+            return np.concatenate([bc_feed, bc_permeate, np.array([bc_Tf, bc_Tp], dtype=float)])
+
+        return np.concatenate([bc_feed, bc_permeate])
 
     # ! build mesh
     def build_mesh(self):
