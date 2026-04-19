@@ -14,12 +14,19 @@ class GasHFMX(GasHFM):
         super().__init__(*args, **kwargs)
 
         self.Ff_scale = np.maximum(self.Ff_in.astype(float), 1e-8)
-        self.Fp_scale = np.maximum(np.where(self.Fp_in > 0.0, self.Fp_in, 1e-8), 1e-8)
+        # NOTE: for counter-current with zero permeate inlet, avoid tiny permeate scales
+        # that can make reported flows floor-dominated.
+        fp_scale_fallback = np.maximum(0.1 * self.Ff_in.astype(float), 1e-8)
+        self.Fp_scale = np.maximum(
+            np.where(self.Fp_in > 1e-12, self.Fp_in, fp_scale_fallback),
+            1e-8
+        )
 
         self.Tf_scale_ref = float(self.Tf_in)
         self.Tp_scale_ref = float(self.Tp_in)
         self.T_scale = 100.0
 
+    # NOTE: override base class methods for scaling
     def build_y0_scaled(self) -> np.ndarray:
         y0_parts = [
             self.Ff_in.astype(float) / self.Ff_scale,
@@ -31,20 +38,26 @@ class GasHFMX(GasHFM):
             y0_parts.append(np.array([theta_f0, theta_p0], dtype=float))
         return np.concatenate(y0_parts)
 
+    # NOTE: build initial guess by scaling the physical initial guess
     def build_initial_guess(self, z_mesh: np.ndarray) -> np.ndarray:
         y_guess_physical = super().build_initial_guess(z_mesh)
 
         ns = self.component_num
         y_guess_scaled = np.array(y_guess_physical, dtype=float, copy=True)
-        y_guess_scaled[:ns, :] = y_guess_physical[:ns, :] / self.Ff_scale[:, None]
-        y_guess_scaled[ns:2 * ns, :] = y_guess_physical[ns:2 * ns, :] / self.Fp_scale[:, None]
+        y_guess_scaled[:ns, :] = y_guess_physical[:ns, :] / \
+            self.Ff_scale[:, None]
+        y_guess_scaled[ns:2 * ns, :] = y_guess_physical[ns:2 *
+                                                        ns, :] / self.Fp_scale[:, None]
 
         if self.heat_transfer_mode == "non-isothermal":
-            y_guess_scaled[2 * ns, :] = (y_guess_physical[2 * ns, :] - self.Tf_scale_ref) / self.T_scale
-            y_guess_scaled[2 * ns + 1, :] = (y_guess_physical[2 * ns + 1, :] - self.Tp_scale_ref) / self.T_scale
+            y_guess_scaled[2 * ns, :] = (y_guess_physical[2 * ns, :] -
+                                         self.Tf_scale_ref) / self.T_scale
+            y_guess_scaled[2 * ns + 1, :] = (
+                y_guess_physical[2 * ns + 1, :] - self.Tp_scale_ref) / self.T_scale
 
         return y_guess_scaled
 
+    # NOTE: build BC residuals by unscaling the state and comparing to scaled inlet conditions
     def bc(self, ya: np.ndarray, yb: np.ndarray) -> np.ndarray:
         ns = self.ns
         bc_feed = ya[:ns] - (self.Ff_in / self.Ff_scale)
@@ -59,6 +72,7 @@ class GasHFMX(GasHFM):
 
         return np.concatenate([bc_feed, bc_permeate])
 
+    # NOTE: unscale the state to physical units, compute physical RHS, then rescale the RHS for the solver
     def _unscale_state(self, y_scaled: np.ndarray) -> Tuple[np.ndarray, np.ndarray, float, float]:
         ns = self.component_num
         idx = 2 * ns
@@ -68,21 +82,24 @@ class GasHFMX(GasHFM):
             dtype=float
         ) * self.Ff_scale
         Fp = np.asarray(
-            smooth_floor(y_scaled[ns:2 * ns], xmin=0.0, s=1e-9),
+            smooth_floor(y_scaled[ns:2 * ns], xmin=0.0, s=1e-14),
             dtype=float
         ) * self.Fp_scale
 
         if self.heat_transfer_mode == "non-isothermal":
             theta_f = float(y_scaled[idx])
             theta_p = float(y_scaled[idx + 1])
-            Tf = float(smooth_floor(self.Tf_scale_ref + self.T_scale * theta_f, xmin=1.0, s=1e-3))
-            Tp = float(smooth_floor(self.Tp_scale_ref + self.T_scale * theta_p, xmin=1.0, s=1e-3))
+            Tf = float(smooth_floor(self.Tf_scale_ref +
+                       self.T_scale * theta_f, xmin=1.0, s=1e-3))
+            Tp = float(smooth_floor(self.Tp_scale_ref +
+                       self.T_scale * theta_p, xmin=1.0, s=1e-3))
         else:
             Tf = float(self.Tf_in)
             Tp = float(self.Tp_in)
 
         return Ff, Fp, Tf, Tp
 
+    # NOTE: helper method to scale the RHS for the solver
     def _scale_rhs(
         self,
         dFf_dz: np.ndarray,
@@ -93,13 +110,16 @@ class GasHFMX(GasHFM):
         out = [dFf_dz / self.Ff_scale, dFp_dz / self.Fp_scale]
 
         if dTf_dz is not None and dTp_dz is not None:
-            out.append(np.array([dTf_dz / self.T_scale, dTp_dz / self.T_scale], dtype=float))
+            out.append(
+                np.array([dTf_dz / self.T_scale, dTp_dz / self.T_scale], dtype=float))
 
         return np.concatenate(out)
 
+    # NOTE: override base class RHS to handle scaling
     def rhs_physical(self, z: float, y: np.ndarray) -> np.ndarray:
         return super().rhs(z, y)
 
+    # NOTE: override base class RHS to handle scaling
     def rhs_scaled(self, z: float, y_scaled: np.ndarray) -> np.ndarray:
         ns = self.component_num
         Ff, Fp, Tf, Tp = self._unscale_state(y_scaled)

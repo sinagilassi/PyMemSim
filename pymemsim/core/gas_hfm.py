@@ -11,6 +11,7 @@ from ..sources.thermo_source import ThermoSource
 from ..utils.reaction_tools import stoichiometry_mat, stoichiometry_mat_key
 from ..utils.thermo_tools import calc_rxn_heat_generation, calc_total_heat_capacity
 from .hfmc import HFMCore
+from ..utils.tools import smooth_floor
 
 
 logger = logging.getLogger(__name__)
@@ -193,14 +194,22 @@ class GasHFM:
             for i in range(ns)
         ])
 
-        # Permeate guess: positive floor at z=0, prescribed inlet at z=L.
-        # Use a mild curved blend to avoid steep profiles near the boundary.
-        ff_total_in = max(float(np.sum(self.Ff_in)), 1e-16)
-        fp_floor = max(1e-12, 1e-3 * ff_total_in / max(ns, 1))
-        fp_start_guess = np.maximum(np.where(self.Fp_in > 0.0, 0.2 * self.Fp_in, fp_floor), fp_floor)
+        # Permeate guess: very small positive floor at z=0 to avoid singular
+        # mole-fraction denominators, while preserving feed-composition shape.
+        # This avoids artificial flat profiles when permeate inlet is zero.
+        ff_total_in = max(float(np.sum(self.Ff_in)), 1e-30)
+        yf_in = self.Ff_in / ff_total_in
+        # NOTE: keep this floor extremely small so it avoids singular
+        # normalization without creating a visible flat-profile artifact.
+        fp_floor_total = max(1e-30, 1e-14 * ff_total_in)
+        fp_floor_vec = fp_floor_total * np.maximum(yf_in, 1e-12)
+        fp_start_guess = np.where(
+            self.Fp_in > 0.0, 0.2 * self.Fp_in, fp_floor_vec)
+        fp_start_guess = np.maximum(fp_start_guess, fp_floor_vec)
         blend = eta ** 1.5
         fp_guess = np.vstack([
-            (1.0 - blend) * float(fp_start_guess[i]) + blend * float(self.Fp_in[i])
+            (1.0 - blend) *
+            float(fp_start_guess[i]) + blend * float(self.Fp_in[i])
             for i in range(ns)
         ])
 
@@ -219,8 +228,22 @@ class GasHFM:
     # SECTION: ODE RHS builder
     def rhs(self, z: float, y: np.ndarray) -> np.ndarray:
         ns = self.component_num
-        Ff = np.clip(y[:ns], 0.0, None)
-        Fp = np.clip(y[ns:2 * ns], 0.0, None)
+
+        # NOTE: regularize flows with smooth floor to avoid numerical
+        # issues in BVP iterations near zero flow conditions.
+        Ff = np.asarray(smooth_floor(
+            y[:ns],
+            xmin=0.0,
+            s=1e-12
+        ), dtype=float
+        )
+        Fp = np.asarray(smooth_floor(
+            y[ns:2 * ns],
+            xmin=0.0,
+            s=1e-12
+        ),
+            dtype=float
+        )
 
         if self.heat_transfer_mode == "non-isothermal":
             Tf = float(y[2 * ns])
@@ -336,10 +359,35 @@ class GasHFM:
         -----
         Gas transport coefficient Pi_i is given in units of mol/m2.s.Pa, so the resulting flux is in mol/m2.s.
         """
-        Ff_total = max(float(np.sum(Ff)), 1e-30)
-        Fp_total = max(float(np.sum(Fp)), 1e-30)
+        # NOTE: regularize total flows with a scale-aware epsilon to avoid
+        # singular normalization without imposing a large fixed minimum.
+        flow_ref = max(float(np.sum(self.Ff_in)), 1e-30)
+        eps_total = max(1e-30, 1e-12 * flow_ref)
+        Ff_total = max(float(np.sum(Ff)), eps_total)
+        Fp_total = max(float(np.sum(Fp)), eps_total)
         yf = Ff / Ff_total
         yp = Fp / Fp_total
+        return self.Pi * (yf * self.Pf - yp * self.Pp)
+
+    def _calc_fluxes_v0(self, Ff: np.ndarray, Fp: np.ndarray) -> np.ndarray:
+        Ff_safe = np.asarray(Ff, dtype=float)
+        Fp_safe = np.asarray(Fp, dtype=float)
+
+        Ff_total = max(float(np.sum(Ff_safe)), 1e-12)
+        Fp_total = max(float(np.sum(Fp_safe)), 1e-12)
+
+        yf = Ff_safe / Ff_total
+
+        # regularized permeate composition
+        if np.sum(self.Fp_in) > 1e-12:
+            yp_ref = self.Fp_in / np.sum(self.Fp_in)
+        else:
+            yp_ref = np.ones_like(Fp_safe) / len(Fp_safe)
+
+        alpha = Fp_total / (Fp_total + 1e-8)
+        yp_raw = Fp_safe / Fp_total
+        yp = alpha * yp_raw + (1.0 - alpha) * yp_ref
+
         return self.Pi * (yf * self.Pf - yp * self.Pp)
 
     # NOTE: calculate feed-side reaction source term from precomputed reaction rates
