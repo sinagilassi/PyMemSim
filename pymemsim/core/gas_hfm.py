@@ -139,9 +139,10 @@ class GasHFM:
         # Permeate at z=L
         res.extend(yb[self.ns:2*self.ns] - self.Fp_in)
 
-        if self.heat_transfer_mode == "non-isothermal":
-            res.append(ya[Tf_idx] - self.Tf_in)
-            res.append(yb[Tp_idx] - self.Tp_in)
+        # TODO: Consider enforcing temperature BCs for non-isothermal case (currently relying on initial guess to anchor temperatures)
+        # if self.heat_transfer_mode == "non-isothermal":
+        #     res.append(ya[Tf_idx] - self.Tf_in)
+        #     res.append(yb[Tp_idx] - self.Tp_in)
 
         return np.array(res)
 
@@ -150,6 +151,7 @@ class GasHFM:
         """
         Build mesh for BVP solver.
         """
+        # TODO: Consider mesh refinement
         pass
 
     # ! build initial guess for BVP solver
@@ -157,6 +159,7 @@ class GasHFM:
         """
         Build initial guess for BVP solver.
         """
+        # TODO: Implement more informed initial guess
         pass
 
     # SECTION: ODE RHS builder
