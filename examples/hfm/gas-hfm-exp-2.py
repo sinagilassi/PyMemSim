@@ -7,7 +7,7 @@ from typing import cast, Literal
 from pythermodb_settings.models import CustomProp, Temperature
 from rich import print
 # ! locals
-from examples.source.gas_load_model_source import model_source, CO2, N2
+from examples.source.gas_load_model_source import model_source, CO2, CH4
 from examples.plot.plot_res import plot_hfm_result, plot_hfm_permeate_flow_profile
 from pymemsim.thermo import build_thermo_source
 from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
@@ -37,7 +37,7 @@ for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pymemsim"
 # ====================================================
 # SECTION: Define components
 # ====================================================
-components = [CO2, N2]
+components = [CO2, CH4]
 
 # ====================================================
 # SECTION: Inputs
@@ -45,7 +45,7 @@ components = [CO2, N2]
 
 # NOTE: heat-transfer options
 heat_transfer_options = HeatTransferOptions(
-    heat_transfer_mode="isothermal",
+    heat_transfer_mode="non-isothermal",
     heat_transfer_coefficient=CustomProp(value=100.0, unit="W/m2.K"),
     heat_transfer_area=CustomProp(value=2.0, unit="m2"),
     jacket_temperature=Temperature(value=330.0, unit="K"),
@@ -59,31 +59,31 @@ thermo_inputs = {}
 # SECTION: Model Inputs
 # ====================================================
 feed_inlet_flows = {
-    "CO2-g": CustomProp(value=0.4, unit="mol/s"),
-    "N2-g": CustomProp(value=0.6, unit="mol/s"),
+    "CO2-g": CustomProp(value=0.5*2.68e-4, unit="mol/s"),
+    "CH4-g": CustomProp(value=0.5*1.78e-4, unit="mol/s"),
 }
 
 permeate_inlet_flows = {
-    "CO2-g": CustomProp(value=0.00, unit="mol/s"),
-    "N2-g": CustomProp(value=0.00, unit="mol/s"),
+    "CO2-g": CustomProp(value=0.000001, unit="mol/s"),
+    "CH4-g": CustomProp(value=0.000001, unit="mol/s"),
 }
 
 # NOTE: gas transport coefficients Pi_i (Permeance) for each component i, in units of mol/s.m2.Pa
 gas_transport_coefficients = {
-    "CO2-g": CustomProp(value=63.6*3.35e-10, unit="mol/s.m2.Pa"),
-    "N2-g": CustomProp(value=3.05*3.35e-10, unit="mol/s.m2.Pa"),
+    "CO2-g": CustomProp(value=31.60*3.35e-10, unit="mol/s.m2.Pa"),
+    "CH4-g": CustomProp(value=8.81*3.35e-10, unit="mol/s.m2.Pa"),
 }
 
 model_inputs = {
     # NOTE: dual-side inlet specs
     "feed_inlet_flows": feed_inlet_flows,
     "permeate_inlet_flows": permeate_inlet_flows,
-    "feed_inlet_temperature": Temperature(value=298.0, unit="K"),
-    "permeate_inlet_temperature": Temperature(value=298.0, unit="K"),
-    "feed_pressure": CustomProp(value=404, unit="kPa"),
+    "feed_inlet_temperature": Temperature(value=338.15, unit="K"),
+    "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
+    "feed_pressure": CustomProp(value=405, unit="kPa"),
     "permeate_pressure": CustomProp(value=101, unit="kPa"),
     # NOTE: membrane parameters
-    "membrane_area_per_length": CustomProp(value=0.05058, unit="m2/m"),
+    "membrane_area_per_length": CustomProp(value=0.231, unit="m2/m"),
     "overall_heat_transfer_coefficient": CustomProp(value=20.0, unit="W/m2.K"),
     "q_ext_feed": CustomProp(value=0.0, unit="W/m2"),
     "q_ext_permeate": CustomProp(value=0.0, unit="W/m2"),
@@ -166,8 +166,8 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
 
 
 # SETUP: run cases
-length_span = (0.0, 0.63)  # [m]
-flow_pattern_to_run = "co-current"
+length_span = (0.0, 0.15)  # [m]
+flow_pattern_to_run = "counter-current"
 
 print("[bold green]Running gas HFM example for both flow patterns...[/bold green]")
 res_case = run_case(flow_pattern=flow_pattern_to_run, length_span=length_span)
