@@ -190,6 +190,7 @@ class HFM:
             - rtol: 1e-6
             - atol: 1e-9
         """
+        # NOTE: route to the appropriate simulation method based on flow pattern
         if self.hfm_core.is_co_current:
             return self._simulate_cocurrent(
                 length_span=length_span,
@@ -308,32 +309,78 @@ class HFM:
                 out[:, j] = self._rhs_point(float(z_arr[j]), y_arr[:, j])
             return out
 
-        # configure the BVP solver options and solve the BVP using scipy's solve_bvp
-        solve_bvp_kwargs: Dict[str, Any] = {
-            "tol": tol,
-            "max_nodes": max_nodes,
-            "verbose": verbose,
-        }
-        if bc_tol is not None:
-            solve_bvp_kwargs["bc_tol"] = float(bc_tol)
+        # NOTE: continuation-style retries for difficult coupled BVPs.
+        attempts = [
+            {"mesh_points": mesh_points, "tol": tol, "max_nodes": max_nodes},
+            {"mesh_points": max(mesh_points, 100), "tol": min(
+                5.0 * tol, 5e-2), "max_nodes": max(max_nodes, 40000)},
+            {"mesh_points": max(mesh_points, 140), "tol": min(
+                10.0 * tol, 1e-1), "max_nodes": max(max_nodes, 80000)},
+        ]
 
-        # run solver
-        sol = solve_bvp(
-            fun=fun,
-            bc=self.module.bc,
-            x=z_mesh,
-            y=y_guess,
-            **solve_bvp_kwargs,
-        )
+        sol = None
+        for k, attempt in enumerate(attempts, start=1):
+            attempt_mesh_points = int(attempt["mesh_points"])
+            attempt_tol = float(attempt["tol"])
+            attempt_max_nodes = int(attempt["max_nodes"])
 
-        if not sol.success:
-            logger.error(
-                "HFM counter-current BVP solver failed: status=%s message=%s nodes=%d tol=%.3e max_nodes=%d",
+            if k == 1:
+                z_mesh_k = z_mesh
+                y_guess_k = y_guess
+            else:
+                z_mesh_k = self.module.build_mesh(
+                    length_span=length_span,
+                    mesh_points=attempt_mesh_points
+                )
+                if sol is None or getattr(sol, "sol", None) is None:
+                    y_guess_k = self.module.build_initial_guess(z_mesh_k)
+                else:
+                    y_guess_k = sol.sol(z_mesh_k)
+                if debug_bc:
+                    bc_guess_k = np.asarray(self.module.bc(
+                        y_guess_k[:, 0], y_guess_k[:, -1]), dtype=float)
+                    logger.info(
+                        "HFM counter-current retry %d initial BC residual: norm_inf=%.3e norm_l2=%.3e",
+                        k,
+                        float(np.max(np.abs(bc_guess_k))),
+                        float(np.linalg.norm(bc_guess_k)),
+                    )
+
+            solve_bvp_kwargs: Dict[str, Any] = {
+                "tol": attempt_tol,
+                "max_nodes": attempt_max_nodes,
+                "verbose": verbose,
+            }
+            if bc_tol is not None:
+                solve_bvp_kwargs["bc_tol"] = float(bc_tol)
+
+            sol = solve_bvp(
+                fun=fun,
+                bc=self.module.bc,
+                x=z_mesh_k,
+                y=y_guess_k,
+                **solve_bvp_kwargs,
+            )
+
+            if sol.success:
+                break
+
+            logger.warning(
+                "HFM counter-current BVP attempt %d failed: status=%s message=%s nodes=%d tol=%.3e max_nodes=%d",
+                k,
                 getattr(sol, "status", "n/a"),
                 sol.message,
                 len(sol.x),
-                tol,
-                max_nodes,
+                attempt_tol,
+                attempt_max_nodes,
+            )
+
+        if sol is None or not sol.success:
+            logger.error(
+                "HFM counter-current BVP solver failed after retries: status=%s message=%s nodes=%d",
+                getattr(sol, "status", "n/a") if sol is not None else "n/a",
+                sol.message if sol is not None else "no solution object",
+                len(sol.x) if sol is not None else 0,
             )
             return None
 
