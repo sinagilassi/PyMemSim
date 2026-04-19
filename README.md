@@ -1,8 +1,12 @@
 # PyMemSim
 
-![PyMemSim](https://drive.google.com/uc?export=view&id=1PCmloxGYElTfuxIVDTV9Objt6cucJ3KC)
+![PyMemSim](https://drive.google.com/uc?export=view&id=1qSO27JxSgVyms5BriNdphkXI7TLJMgWq)
 
-![Downloads](https://img.shields.io/pypi/dm/PyMemSim) ![PyPI](https://img.shields.io/pypi/v/PyMemSim) ![Python Version](https://img.shields.io/pypi/pyversions/PyMemSim.svg) ![License](https://img.shields.io/pypi/l/PyMemSim) ![Read the Docs](https://img.shields.io/readthedocs/PyMemSim)
+![Downloads](https://img.shields.io/pypi/dm/PyMemSim)
+![PyPI](https://img.shields.io/pypi/v/PyMemSim)
+![Python Version](https://img.shields.io/pypi/pyversions/PyMemSim.svg)
+![License](https://img.shields.io/pypi/l/PyMemSim)
+![Read the Docs](https://img.shields.io/readthedocs/PyMemSim)
 
 **PyMemSim** is a Python package for membrane-process simulation, with a current focus on hollow-fiber membrane (HFM) models.
 
@@ -17,7 +21,7 @@ Current capabilities include:
 - Dual-side inlet specification (feed/permeate flows, temperatures, pressures).
 - Constant-pressure operation for feed and permeate sides.
 - Component-wise transport coefficients for gas and liquid systems.
-- Solver-based simulation (`scipy.integrate.solve_ivp`) with configurable solver options.
+- Solver-based simulation (`scipy.integrate.solve_ivp` for IVP and `scipy.integrate.solve_bvp` via `solver_bvp` for BVP) with configurable solver options.
 
 ## Installation
 
@@ -39,10 +43,27 @@ print(pms.__version__)
 For a complete end-to-end setup (thermo source, options, model inputs, module creation, and simulation), see:
 
 - `examples/hfm/gas-hfm-exp-1.py`
+- `examples/hfm/gas-hfm-exp-2.py`
 
 You can also review:
 
 - `examples/hfm/liquid-hfm-exp-1.py`
+
+### Co-current vs Counter-current (Gas HFM)
+
+The gas HFM examples show how to switch the membrane flow arrangement through:
+
+- `HollowFiberMembraneOptions(..., flow_pattern="co-current")`
+- `HollowFiberMembraneOptions(..., flow_pattern="counter-current")`
+
+Reference examples:
+
+- `examples/hfm/gas-hfm-exp-1.py`:
+  co-current case (`flow_pattern_to_run = "co-current"`), solved with IVP-style solver options (`Radau`, `rtol`, `atol`).
+- `examples/hfm/gas-hfm-exp-2.py`:
+  counter-current case (`flow_pattern_to_run = "counter-current"`), solved with `solver_bvp` and BVP-style options (`mesh_points`, `tol`, `bc_tol`, `max_nodes`).
+
+You can run either arrangement in both files by changing `flow_pattern_to_run` to `"co-current"` or `"counter-current"`.
 
 ## Development Status
 
