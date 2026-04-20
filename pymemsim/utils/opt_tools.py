@@ -115,3 +115,6 @@ def set_component_X(
     X_spec_array = np.array(X_spec_list)
 
     return X_spec, X_spec_array
+
+
+# SECTION:
