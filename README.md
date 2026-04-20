@@ -2,11 +2,10 @@
 
 ![PyMemSim](https://drive.google.com/uc?export=view&id=1qSO27JxSgVyms5BriNdphkXI7TLJMgWq)
 
-![Downloads](https://img.shields.io/pypi/dm/PyMemSim)
-![PyPI](https://img.shields.io/pypi/v/PyMemSim)
-![Python Version](https://img.shields.io/pypi/pyversions/PyMemSim.svg)
-![License](https://img.shields.io/pypi/l/PyMemSim)
-![Read the Docs](https://img.shields.io/readthedocs/PyMemSim)
+[![PyPI Downloads](https://static.pepy.tech/badge/pymemsim/month)](https://pepy.tech/projects/pymemsim)
+![PyPI](https://img.shields.io/pypi/v/pymemsim)
+![Python Version](https://img.shields.io/pypi/pyversions/pymemsim.svg)
+![License](https://img.shields.io/pypi/l/pymemsim)
 
 **PyMemSim** is a Python package for membrane-process simulation, with a current focus on hollow-fiber membrane (HFM) models.
 
