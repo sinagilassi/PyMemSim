@@ -1,4 +1,4 @@
-# PyMemSim
+# 🧪 PyMemSim
 
 ![PyMemSim](https://drive.google.com/uc?export=view&id=1qSO27JxSgVyms5BriNdphkXI7TLJMgWq)
 
@@ -10,7 +10,7 @@
 
 **PyMemSim** is a Python package for membrane-process simulation, with a current focus on hollow-fiber membrane (HFM) models.
 
-## Package Functionalities
+## ⚙️ Package Functionalities
 
 Current capabilities include:
 
@@ -23,7 +23,7 @@ Current capabilities include:
 - Component-wise transport coefficients for gas and liquid systems.
 - Solver-based simulation (`scipy.integrate.solve_ivp` for IVP and `scipy.integrate.solve_bvp` via `solver_bvp` for BVP) with configurable solver options.
 
-## Installation
+## 📦 Installation
 
 Install from PyPI:
 
@@ -38,7 +38,7 @@ import pymemsim as pms
 print(pms.__version__)
 ```
 
-## Usage Examples
+## 🚀 Usage Examples
 
 For a complete end-to-end setup (thermo source, options, model inputs, module creation, and simulation), see:
 
@@ -49,7 +49,7 @@ You can also review:
 
 - `examples/hfm/liquid-hfm-exp-1.py`
 
-### Co-current vs Counter-current (Gas HFM)
+### 🔄 Co-current vs Counter-current (Gas HFM)
 
 The gas HFM examples show how to switch the membrane flow arrangement through:
 
@@ -65,14 +65,14 @@ Reference examples:
 
 You can run either arrangement in both files by changing `flow_pattern_to_run` to `"co-current"` or `"counter-current"`.
 
-## Development Status
+## 🛠️ Development Status
 
 PyMemSim is under active development. APIs, model options, and behaviors may change in future releases.
 
-## License
+## 📄 License
 
-This project is licensed under the MIT License. You are free to use, modify, and distribute this software in your own applications or projects. However, if you choose to use this app in another app or software, please ensure that my name, Sina Gilassi, remains credited as the original author. This includes retaining any references to the original repository or documentation where applicable. By doing so, you help acknowledge the effort and time invested in creating this project.
+This project is licensed under the Apache-2.0 License. You are free to use, modify, and distribute this software in your own applications or projects. However, if you choose to use this app in another app or software, please ensure that my name, Sina Gilassi, remains credited as the original author. This includes retaining any references to the original repository or documentation where applicable. By doing so, you help acknowledge the effort and time invested in creating this project.
 
-## FAQ
+## ❓ FAQ
 
 For any question, contact me on [LinkedIn](https://www.linkedin.com/in/sina-gilassi/)
