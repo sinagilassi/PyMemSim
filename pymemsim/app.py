@@ -28,7 +28,8 @@ def create_hfm_module(
     ----------
     model_inputs : Dict[str, Any]
         A dictionary of model inputs, where the keys are the names of the inputs and the values are the input values.
-        - feed mole: Dict[str, CustomProp]
+        - feed_inlet_flows: Dict[str, CustomProp]
+          or feed_inlet_flow + feed_mole_fractions
         - feed temperature: Temperature
         - feed pressure: Pressure
     thermo_source : ThermoSource
