@@ -40,7 +40,8 @@ class HFMCore(MembraneCore):
 
         # SECTION: core options
         self.phase = unit_options.phase
-        self.flow_pattern = self._normalize_flow_pattern(unit_options.flow_pattern)
+        self.flow_pattern = self._normalize_flow_pattern(
+            unit_options.flow_pattern)
         self.operation_mode = getattr(
             unit_options, "operation_mode", "constant_pressure")
         self.feed_pressure_mode = getattr(
@@ -59,17 +60,18 @@ class HFMCore(MembraneCore):
             )
 
         # SECTION: side-specific inlet states with backward compatibility keys
+        # ! feed inlet total flow [mol/s] when feed is specified via total flow + composition
+        self.feed_inlet_flow = None
+
+        # ! feed mole fractions by component id when feed is specified via total flow + composition
+        self.feed_mole_fractions = None
+
         # ! feed-side inlet flows [mol/s]
         (
             self.feed_inlet_flows_comp,
             self.feed_inlet_flows,
             self.feed_inlet_flow_total
-        ) = self._config_side_inlet_flows(
-            primary_key="feed_inlet_flows",
-            fallback_key="inlet_flows",
-            required=True,
-            default_component_value=0.0,
-        )
+        ) = self._config_feed_inlet_flows()
 
         # ! permeate-side inlet flows [mol/s]
         (
@@ -196,6 +198,120 @@ class HFMCore(MembraneCore):
             )
 
     # SECTION: side-input helpers
+    def _config_feed_inlet_flows(self):
+        has_explicit_flows = (
+            "feed_inlet_flows" in self.model_inputs_keys or
+            "inlet_flows" in self.model_inputs_keys
+        )
+        has_total_flow = "feed_inlet_flow" in self.model_inputs_keys
+        has_mole_fractions = "feed_mole_fractions" in self.model_inputs_keys
+
+        # NOTE: keep a single input mode to avoid ambiguous configuration.
+        if has_explicit_flows and (has_total_flow or has_mole_fractions):
+            raise ValueError(
+                "Ambiguous feed inlet specification. Use either "
+                "'feed_inlet_flows' (or legacy 'inlet_flows') OR "
+                "the pair 'feed_inlet_flow' + 'feed_mole_fractions', not both."
+            )
+
+        # NOTE: existing mode: component-wise feed inlet flows.
+        if has_explicit_flows:
+            return self._config_side_inlet_flows(
+                primary_key="feed_inlet_flows",
+                fallback_key="inlet_flows",
+                required=True,
+                default_component_value=0.0,
+            )
+
+        # NOTE: new mode: total feed flow + feed mole fractions.
+        if has_total_flow or has_mole_fractions:
+            if not has_total_flow or not has_mole_fractions:
+                missing_key = "feed_inlet_flow" if not has_total_flow else "feed_mole_fractions"
+                raise ValueError(
+                    f"'{missing_key}' must be provided when using "
+                    "'feed_inlet_flow'/'feed_mole_fractions' feed specification mode."
+                )
+
+            feed_total_flow = self._to_mol_per_s_value(
+                self.model_inputs["feed_inlet_flow"]
+            )
+            if feed_total_flow < 0.0:
+                raise ValueError("'feed_inlet_flow' must be non-negative.")
+
+            feed_mole_fractions_comp, feed_mole_fractions = self._config_feed_mole_fractions()
+            feed_flows = feed_total_flow * feed_mole_fractions
+            feed_flows_comp = {
+                comp_id: float(feed_flows[i])
+                for i, comp_id in enumerate(self.component_formula_state)
+            }
+
+            self.feed_inlet_flow = float(feed_total_flow)
+            self.feed_mole_fractions = feed_mole_fractions_comp
+
+            return (
+                feed_flows_comp,
+                feed_flows.astype(float),
+                float(np.sum(feed_flows)),
+            )
+
+        # NOTE: fallback behavior: raise the standard missing-required key error.
+        return self._config_side_inlet_flows(
+            primary_key="feed_inlet_flows",
+            fallback_key="inlet_flows",
+            required=True,
+            default_component_value=0.0,
+        )
+
+    def _config_feed_mole_fractions(self) -> tuple[Dict[str, float], np.ndarray]:
+        key = "feed_mole_fractions"
+        raw = self.model_inputs[key]
+        if not isinstance(raw, Mapping):
+            raise ValueError(
+                f"'{key}' must be a mapping of component ids to mole fractions."
+            )
+
+        x_comp: Dict[str, float] = {}
+        x_values: List[float] = []
+
+        for comp_id in self.component_formula_state:
+            if comp_id not in raw:
+                raise ValueError(
+                    f"Missing mole fraction entry for component '{comp_id}' in '{key}'."
+                )
+
+            x_i = self._to_dimensionless_fraction(raw[comp_id], key=key, component_id=comp_id)
+            if x_i < 0.0:
+                raise ValueError(
+                    f"Mole fraction for component '{comp_id}' in '{key}' must be non-negative."
+                )
+
+            x_comp[comp_id] = x_i
+            x_values.append(x_i)
+
+        x = np.array(x_values, dtype=float)
+        x_sum = float(np.sum(x))
+        if x_sum <= 0.0:
+            raise ValueError(
+                f"Sum of mole fractions in '{key}' must be greater than zero."
+            )
+
+        if not np.isclose(x_sum, 1.0, rtol=1e-6, atol=1e-8):
+            raise ValueError(
+                f"Mole fractions in '{key}' must sum to 1.0 (current sum: {x_sum})."
+            )
+
+        return x_comp, x
+
+    def _to_dimensionless_fraction(self, value: Any, key: str, component_id: str) -> float:
+        raw_value, raw_unit = self._extract_value_unit(value)
+        unit = str(raw_unit).strip().replace(" ", "")
+        if unit not in ("", "-", "1", "mol/mol", "molefraction"):
+            raise ValueError(
+                f"Unsupported unit '{raw_unit}' for '{key}'[{component_id}]. "
+                "Use dimensionless values."
+            )
+        return float(raw_value)
+
     def _config_side_inlet_flows(
         self,
         primary_key: str,
