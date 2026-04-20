@@ -190,7 +190,7 @@ if res_case is not None:
         components=components,
         show=True,
         title_prefix=f"Gas HFM {flow_pattern_to_run}",
-        basis="mole_fraction",
+        basis="flow",
     )
     # plot_hfm_permeate_flow_profile(
     #     result=res_case,
