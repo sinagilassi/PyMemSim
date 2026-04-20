@@ -60,7 +60,7 @@ thermo_inputs = {}
 # SECTION: Model Inputs
 # ====================================================
 # volumetric flow rate
-feed_volumetric_flow = CustomProp(value=1e-4, unit="m3/min")
+feed_volumetric_flow = CustomProp(value=0.8e-4, unit="m3/min")
 # convert to molar flow rate at standard conditions using ideal gas law
 feed_molar_flow = Q_std_to_mol_s(feed_volumetric_flow)
 print(f"feed molar flow: {feed_molar_flow.value:.4e} {feed_molar_flow.unit}")
@@ -142,8 +142,8 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
     else:
         solver_options = {
             "mesh_points": 120,
-            "tol": 1e-2,
-            "bc_tol": 1e-2,
+            "tol": 1e-3,
+            "bc_tol": 1e-3,
             "max_nodes": 50000,
             "verbose": 2,
             "debug_bc": True,
