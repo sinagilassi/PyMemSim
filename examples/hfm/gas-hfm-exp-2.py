@@ -13,6 +13,7 @@ from pymemsim.thermo import build_thermo_source
 from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
 from pymemsim import HFM, create_hfm_module
 from pymemsim.utils import analyze_hfm_result, print_hfm_result_tables
+from pymemsim.utils import Q_std_to_mol_s, to_m3_per_s
 
 # NOTE: example source and kinetics
 # ! add project root and examples root to import path for standalone script execution
@@ -27,7 +28,7 @@ for path in (PROJECT_DIR, EXAMPLES_DIR):
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 SUPPRESS_PYMEMSIM_LOGS = False
-for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pymemsim", "pyreactlab_core"):
+for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pyreactlab_core"):
     if logger_name == "pymemsim" and not SUPPRESS_PYMEMSIM_LOGS:
         logging.getLogger(logger_name).setLevel(logging.INFO)
         continue
@@ -58,15 +59,24 @@ thermo_inputs = {}
 # ====================================================
 # SECTION: Model Inputs
 # ====================================================
-feed_inlet_flows = {
-    "CO2-g": CustomProp(value=0.5*2.68e-4, unit="mol/s"),
-    "CH4-g": CustomProp(value=0.5*1.78e-4, unit="mol/s"),
+# volumetric flow rate
+feed_volumetric_flow = CustomProp(value=1e-4, unit="m3/min")
+# convert to molar flow rate at standard conditions using ideal gas law
+feed_molar_flow = Q_std_to_mol_s(feed_volumetric_flow)
+print(f"feed molar flow: {feed_molar_flow.value:.4e} {feed_molar_flow.unit}")
+
+# feed specification mode: total molar flow + feed mole fractions
+feed_inlet_flow = CustomProp(value=feed_molar_flow.value, unit="mol/s")
+feed_mole_fractions = {
+    "CO2-g": CustomProp(value=0.6, unit=""),
+    "CH4-g": CustomProp(value=0.4, unit=""),
 }
 
-permeate_inlet_flows = {
-    "CO2-g": CustomProp(value=0.000001, unit="mol/s"),
-    "CH4-g": CustomProp(value=0.000001, unit="mol/s"),
-}
+# permeate inlet flow (can be set to zero or a small value to avoid numerical issues with zero flow)
+# permeate_inlet_flows = {
+#     "CO2-g": CustomProp(value=0.000001, unit="mol/s"),
+#     "CH4-g": CustomProp(value=0.000001, unit="mol/s"),
+# }
 
 # NOTE: gas transport coefficients Pi_i (Permeance) for each component i, in units of mol/s.m2.Pa
 gas_transport_coefficients = {
@@ -76,11 +86,13 @@ gas_transport_coefficients = {
 
 model_inputs = {
     # NOTE: dual-side inlet specs
-    "feed_inlet_flows": feed_inlet_flows,
-    "permeate_inlet_flows": permeate_inlet_flows,
+    # ! feed
+    "feed_inlet_flow": feed_inlet_flow,
+    "feed_mole_fractions": feed_mole_fractions,
     "feed_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
     "feed_pressure": CustomProp(value=405, unit="kPa"),
+    # ! permeate
+    "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
     "permeate_pressure": CustomProp(value=101, unit="kPa"),
     # NOTE: membrane parameters
     "membrane_area_per_length": CustomProp(value=0.231, unit="m2/m"),
@@ -178,7 +190,7 @@ if res_case is not None:
         components=components,
         show=True,
         title_prefix=f"Gas HFM {flow_pattern_to_run}",
-        basis="flow",
+        basis="mole_fraction",
     )
     # plot_hfm_permeate_flow_profile(
     #     result=res_case,
