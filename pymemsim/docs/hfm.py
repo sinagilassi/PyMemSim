@@ -12,6 +12,7 @@ from ..core.liquid_hfm import LiquidHFM
 from ..core.liquid_hfmx import LiquidHFMX
 from ..models.hfm import HollowFiberMembraneOptions
 from ..models.results import MembraneResult
+from ..solvers.countercurrent_shooting import solve_countercurrent_shooting
 from ..sources.thermo_source import ThermoSource
 from ..utils.tools import configure_solver_options
 
@@ -269,8 +270,26 @@ class HFM:
                 "(GasHFM and GasHFMX) in this release."
             )
 
+        solver_options_local = solver_options.copy() if solver_options is not None else {}
+        countercurrent_solver = str(
+            solver_options_local.pop("countercurrent_solver", "bvp")
+        ).strip().lower()
+
+        if countercurrent_solver == "shooting":
+            return solve_countercurrent_shooting(
+                module=self.module,
+                rhs_point=self._rhs_point,
+                state_to_physical=self._state_to_physical,
+                length_span=length_span,
+                solver_options=solver_options_local,
+            )
+        if countercurrent_solver != "bvp":
+            raise ValueError(
+                "Invalid countercurrent_solver. Supported values are 'bvp' and 'shooting'."
+            )
+
         # configure BVP solver options with defaults
-        bvp_options = solver_options.copy() if solver_options is not None else {}
+        bvp_options = solver_options_local
         mesh_points = int(bvp_options.pop("mesh_points", 80))
         tol = float(bvp_options.pop("tol", 1e-3))
         max_nodes = int(bvp_options.pop("max_nodes", 20000))
