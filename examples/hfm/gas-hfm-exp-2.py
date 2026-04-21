@@ -46,7 +46,7 @@ components = [CO2, CH4]
 
 # NOTE: heat-transfer options
 heat_transfer_options = HeatTransferOptions(
-    heat_transfer_mode="non-isothermal",
+    heat_transfer_mode="isothermal",
     heat_transfer_coefficient=CustomProp(value=100.0, unit="W/m2.K"),
     heat_transfer_area=CustomProp(value=2.0, unit="m2"),
     jacket_temperature=Temperature(value=330.0, unit="K"),
@@ -102,6 +102,8 @@ model_inputs = {
     "gas_transport_coefficients": gas_transport_coefficients,
 }
 
+COUNTERCURRENT_METHOD = "bvp"  # "bvp" | "shooting"
+
 
 def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneResult | None:
     # NOTE: membrane unit options per flow pattern
@@ -133,21 +135,46 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
     )
 
     # NOTE: route solver options by flow pattern
+    cocurrent_solver_options = {
+        "method": "Radau",
+        "rtol": 1e-6,
+        "atol": 1e-9,
+    }
+    countercurrent_bvp_solver_options = {
+        "countercurrent_solver": "bvp",
+        "mesh_points": 120,
+        "tol": 1e-3,
+        "bc_tol": 1e-3,
+        "max_nodes": 50000,
+        "verbose": 2,
+        "debug_bc": True,
+    }
+    countercurrent_shooting_solver_options = {
+        "countercurrent_solver": "shooting",
+        "shooting_ivp_method": "auto",
+        "shooting_ivp_rtol": 1e-6,
+        "shooting_ivp_atol": 1e-9,
+        "shooting_max_nfev": 1200,
+        "shooting_ftol": 1e-8,
+        "shooting_xtol": 1e-8,
+        "shooting_gtol": 1e-8,
+        "shooting_residual_tol": 1e-3,
+        "shooting_multistart": True,
+        "shooting_penalty": 1e3,
+        "shooting_debug": True,
+    }
+
     if flow_pattern == "co-current":
-        solver_options = {
-            "method": "Radau",
-            "rtol": 1e-6,
-            "atol": 1e-9,
-        }
+        solver_options = cocurrent_solver_options
     else:
-        solver_options = {
-            "mesh_points": 120,
-            "tol": 1e-3,
-            "bc_tol": 1e-3,
-            "max_nodes": 50000,
-            "verbose": 2,
-            "debug_bc": True,
-        }
+        if COUNTERCURRENT_METHOD == "bvp":
+            solver_options = countercurrent_bvp_solver_options
+        elif COUNTERCURRENT_METHOD == "shooting":
+            solver_options = countercurrent_shooting_solver_options
+        else:
+            raise ValueError(
+                "Invalid COUNTERCURRENT_METHOD. Supported values are 'bvp' and 'shooting'."
+            )
     print(
         f"[bold yellow]solver options ({flow_pattern}):[/bold yellow] {solver_options}")
 

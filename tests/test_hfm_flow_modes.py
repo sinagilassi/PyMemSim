@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
@@ -8,6 +9,7 @@ from pymemsim.core.hfmc import HFMCore
 from pymemsim.core.liquid_hfm import LiquidHFM
 from pymemsim.docs.hfm import HFM
 from pymemsim.models.hfm import HollowFiberMembraneOptions
+from pymemsim.models.results import MembraneResult
 
 
 def _build_hfm_with_module(
@@ -60,6 +62,20 @@ class _DummyGasScaled(GasHFMX):
         ff = y_scaled[:1] * self.Ff_scale
         fp = y_scaled[1:2] * self.Fp_scale
         return ff, fp, self.Tf_in, self.Tp_in
+
+
+class _DummyGasPhysicalNonIsothermal(GasHFM):
+    def __init__(self):
+        self.component_num = 1
+        self.ns = 1
+        self.heat_transfer_mode = "non-isothermal"
+        self.Ff_in = np.array([1.0], dtype=float)
+        self.Fp_in = np.array([0.2], dtype=float)
+        self.Tf_in = 330.0
+        self.Tp_in = 290.0
+
+    def rhs(self, z: float, y: np.ndarray) -> np.ndarray:
+        return np.array([0.0, 0.0, 0.0, 0.0], dtype=float)
 
 
 class _DummyLiquid(LiquidHFM):
@@ -122,6 +138,111 @@ def test_countercurrent_bvp_converges_scaled_and_is_finite():
     assert res.success is True
     assert np.all(np.isfinite(res.state))
     assert np.all(res.state[:2, :] >= 0.0)
+
+
+def test_countercurrent_bvp_explicit_option_regression():
+    module = _DummyGasPhysical()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+
+    res = hfm.simulate(
+        length_span=(0.0, 1.0),
+        solver_options={
+            "countercurrent_solver": "bvp",
+            "mesh_points": 30,
+            "tol": 1e-5,
+            "max_nodes": 5000,
+        },
+    )
+    assert res is not None
+    assert res.success is True
+
+
+def test_countercurrent_shooting_converges_physical():
+    module = _DummyGasPhysical()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+
+    res = hfm.simulate(
+        length_span=(0.0, 1.0),
+        solver_options={"countercurrent_solver": "shooting"},
+    )
+    assert res is not None
+    assert res.success is True
+    bc_res = module.bc(res.state[:, 0], res.state[:, -1])
+    assert np.max(np.abs(bc_res[module.ns:2 * module.ns])) < 1e-6
+
+
+def test_countercurrent_shooting_converges_scaled_and_is_finite():
+    module = _DummyGasScaled()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+
+    res = hfm.simulate(
+        length_span=(0.0, 1.0),
+        solver_options={"countercurrent_solver": "shooting"},
+    )
+    assert res is not None
+    assert res.success is True
+    assert np.all(np.isfinite(res.state))
+    assert np.all(res.state[:2, :] >= 0.0)
+
+
+def test_countercurrent_shooting_non_isothermal_terminal_temperature_enforced():
+    module = _DummyGasPhysicalNonIsothermal()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+
+    res = hfm.simulate(
+        length_span=(0.0, 1.0),
+        solver_options={"countercurrent_solver": "shooting"},
+    )
+    assert res is not None
+    assert res.success is True
+    bc_res = module.bc(res.state[:, 0], res.state[:, -1])
+    assert abs(float(bc_res[-1])) < 1e-6
+
+
+def test_countercurrent_shooting_failure_returns_none():
+    module = _DummyGasPhysical()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+
+    res = hfm.simulate(
+        length_span=(0.0, 1.0),
+        solver_options={
+            "countercurrent_solver": "shooting",
+            "shooting_ivp_method": "NOT_A_VALID_METHOD",
+            "shooting_max_nfev": 10,
+        },
+    )
+    assert res is None
+
+
+def test_countercurrent_shooting_route_calls_solver_module():
+    module = _DummyGasPhysical()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+    fake = MembraneResult(
+        span=np.array([0.0, 1.0], dtype=float),
+        state=np.array([[1.0, 1.0], [0.2, 0.2]], dtype=float),
+        success=True,
+        message="ok",
+    )
+
+    with patch("pymemsim.docs.hfm.solve_countercurrent_shooting", return_value=fake) as mocked:
+        res = hfm.simulate(
+            length_span=(0.0, 1.0),
+            solver_options={"countercurrent_solver": "shooting"},
+        )
+
+    assert mocked.called
+    assert res is fake
+
+
+def test_countercurrent_solver_invalid_option_raises():
+    module = _DummyGasPhysical()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+
+    with _expect_raises(ValueError, "Invalid countercurrent_solver"):
+        hfm.simulate(
+            length_span=(0.0, 1.0),
+            solver_options={"countercurrent_solver": "invalid"},
+        )
 
 
 def test_countercurrent_liquid_guardrail():
