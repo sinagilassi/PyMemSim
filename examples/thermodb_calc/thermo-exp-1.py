@@ -10,9 +10,9 @@
 # from pyreactsim.models import BatchReactorOptions, HeatTransferOptions
 # from pyreactsim.thermo import build_thermo_source
 # from pyreactsim import create_batch_reactor, BatchReactor
-# from pyThermoCalcDB.docs.thermo import calc_En_IG_ref
-# from pyThermoCalcDB.reactions.source import dH_rxn_STD
-# from pyThermoCalcDB.models import ComponentEnthalpy
+# from pythermocalcdb.docs.thermo import calc_En_IG_ref
+# from pythermocalcdb.reactions.source import dH_rxn_STD
+# from pythermocalcdb.models import ComponentEnthalpy
 # from pyreactlab_core.models.reaction import Reaction
 
 # # NOTE: Batch reactor settings

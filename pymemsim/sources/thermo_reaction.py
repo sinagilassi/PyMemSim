@@ -5,8 +5,8 @@ from typing import List, Dict, Any, cast
 from pythermodb_settings.models import Component, Temperature, Pressure, CustomProperty, CustomProp, ComponentKey
 from pyreactlab_core import build_rxns_stoichiometry
 from pyThermoLinkDB.models import ModelSource
-from pyThermoCalcDB.reactions import build_hsg_reaction
-from pyThermoCalcDB.core import HSGReaction
+from pythermocalcdb.reactions import build_hsg_reaction
+from pythermocalcdb.core import HSGReaction
 from pyreactsim_core.models.rate_exp import ReactionRateExpression
 # locals
 from ..utils.reaction_tools import stoichiometry_mat

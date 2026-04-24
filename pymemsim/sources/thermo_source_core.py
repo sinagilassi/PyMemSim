@@ -7,10 +7,10 @@ from pyThermoLinkDB.thermo import Source
 from pyThermoLinkDB.models import ModelSource
 from pyThermoLinkDB.models.component_models import ComponentEquationSource
 from pyreactlab_core.models.reaction import Reaction
-from pyThermoCalcDB.reactions.reactions import dH_rxn_STD
-from pyThermoCalcDB.docs.thermo import calc_En_IG_ref, calc_En, calc_En_IG_ref_hsg, calc_En_hsg
-from pyThermoCalcDB.reactions.source import dH_rxn_STD as dH_rxn_reactions
-from pyThermoCalcDB.models import ComponentEnthalpy
+from pythermocalcdb.reactions.reactions import dH_rxn_STD
+from pythermocalcdb.docs.thermo import calc_En_IG_ref, calc_En, calc_En_IG_ref_hsg, calc_En_hsg
+from pythermocalcdb.reactions.source import dH_rxn_STD as dH_rxn_reactions
+from pythermocalcdb.models import ComponentEnthalpy
 from pyreactsim_core.models.rate_exp import ReactionRateExpression
 # locals
 from .thermo_model_inputs import ThermoModelInputs
