@@ -29,18 +29,15 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
-    "numpy>=2.4.3",
-    "scipy>=1.17.1",
-    "pydantic>=2.12.5",
-    "pydantic-settings>=2.13.1",
-    "rich>=14.3.3",
-    "pycuc>=2.7.0",
-    "pythermodb>=1.12.2",
-    "pythermolinkdb>=1.4.14",
-    "pythermodb-settings>=0.2.10",
-    "pythermocalcdb>=0.10.0",
-    "pyreactsim-core>=0.1.0",
-    "matplotlib>=3.10.8",
+    "numpy",
+    "scipy",
+    "pydantic",
+    "pycuc",
+    "pythermodb",
+    "pythermolinkdb",
+    "pythermodb-settings",
+    "pythermocalcdb",
+    "pyreactsim-core",
 ]
 
 [project.urls]
