@@ -27,7 +27,7 @@ for path in (PROJECT_DIR, EXAMPLES_DIR):
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
 SUPPRESS_PYMEMSIM_LOGS = False
-for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pymemsim", "pyreactlab_core"):
+for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pythermocalcdb", "pymemsim", "pyreactlab_core"):
     if logger_name == "pymemsim" and not SUPPRESS_PYMEMSIM_LOGS:
         logging.getLogger(logger_name).setLevel(logging.INFO)
         continue

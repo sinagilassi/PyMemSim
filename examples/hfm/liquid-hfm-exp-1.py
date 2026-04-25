@@ -1,4 +1,9 @@
 # import packages/modules
+from examples.plot.plot_res import plot_hfm_result
+from examples.source.liquid_model_source_exp_1 import components, model_source
+from pymemsim.thermo import build_thermo_source
+from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
+from pymemsim import HFM, create_hfm_module
 import logging
 import sys
 import warnings
@@ -16,18 +21,12 @@ for path in (PROJECT_DIR, EXAMPLES_DIR):
         sys.path.insert(0, str(path))
 
 # locals
-from pymemsim import HFM, create_hfm_module
-from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
-from pymemsim.thermo import build_thermo_source
-
-from examples.source.liquid_model_source_exp_1 import components, model_source
-from examples.plot.plot_res import plot_hfm_result
 
 
 # NOTE: silence library warnings/errors for this example run
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
-for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pyThermoCalcDB", "pymemsim", "pyreactlab_core"):
+for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pythermocalcdb", "pymemsim", "pyreactlab_core"):
     logging.getLogger(logger_name).setLevel(logging.CRITICAL + 1)
 
 
