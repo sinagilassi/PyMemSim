@@ -4,7 +4,7 @@
 # package name
 __package__ = 'pymemsim'
 # version
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 # description
 __description__ = 'A Python toolkit for modeling of membrane-based gas separation processes.'
 # author

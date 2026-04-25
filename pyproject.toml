@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pymemsim"
-version = "0.2.0"
+version = "0.2.1"
 description = "PyMemSim is a Python package for modelling of membrane-based separation systems."
 readme = "README.md"
 requires-python = ">=3.11"
