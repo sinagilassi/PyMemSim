@@ -558,6 +558,45 @@ class HFMCore(MembraneCore):
         )
 
     # NOTE: configure component-wise transport coefficients in component order.
+    def _normalize_transport_coefficient_value(
+        self,
+        value: float,
+        unit: str,
+        key: str,
+        comp_id: str,
+    ) -> float:
+        # NOTE: validate unit based on phase/key and convert to internal units when needed
+        unit_normalized = unit.strip().lower()
+        if (
+            self.phase == "gas" and
+            key == "gas_transport_coefficients"
+        ):
+            if unit_normalized not in ("gpu", "gas permeation unit", "mol/s.m2.pa"):
+                raise ValueError(
+                    f"Unsupported unit '{unit}' for gas transport coefficient of component '{comp_id}' in '{key}'. "
+                    "Use 'GPU' (Gas Permeation Unit) or 'mol/s.m2.Pa'."
+                )
+            if unit_normalized in ("gpu", "gas permeation unit"):
+                return float(
+                    from_gpu_to_mol_per_s_m2_Pa(CustomProp(value=value, unit=unit))
+                )
+            return float(value)
+
+        if (
+            self.phase == "liquid" and
+            key == "liquid_transport_coefficients"
+        ):
+            if unit_normalized not in ("m/s", "meter per second"):
+                raise ValueError(
+                    f"Unsupported unit '{unit}' for liquid transport coefficient of component '{comp_id}' in '{key}'. "
+                    "Use 'm/s' (meter per second)."
+                )
+            return float(value)
+
+        raise ValueError(
+            f"Invalid transport coefficient key '{key}' for phase '{self.phase}'."
+        )
+
     def _config_transport_coefficients(self, key: str, required: bool) -> np.ndarray:
         if key not in self.model_inputs_keys:
             if required:
@@ -590,7 +629,7 @@ class HFMCore(MembraneCore):
                 # value
                 value = float(item.value)
                 # unit
-                unit = str(item.value).strip()
+                unit = str(item.unit).strip()
             # ! mapping input {'value', ...}
             elif isinstance(item, Mapping):
                 if "value" not in item:
@@ -609,42 +648,15 @@ class HFMCore(MembraneCore):
             # ! bare numeric
             else:
                 raise ValueError(
-                    f"Transport coefficient for '{comp_id}' in '{key}' must be a numeric value or an object with a 'value' attribute."
+                    f"Transport coefficient for '{comp_id}' in '{key}' must explicitly provide both 'value' and 'unit'."
                 )
 
-            # NOTE: check unit based on phase and key conventions
-            if (
-                self.phase == "gas" and
-                key == "gas_transport_coefficients"
-            ):
-                # ! unit check
-                if unit.lower() not in ("gpu", "gas permeation unit", "mol/s.m2.pa"):
-                    raise ValueError(
-                        f"Unsupported unit '{unit}' for gas transport coefficient of component '{comp_id}' in '{key}'. "
-                        "Use 'GPU' (Gas Permeation Unit) or 'mol/s.m2.Pa'."
-                    )
-
-                # ! unit conversion
-                if unit.lower() in ("gpu", "gas permeation unit"):
-                    value = from_gpu_to_mol_per_s_m2_Pa(
-                        CustomProp(value=value, unit=unit)
-                    )
-            elif (
-                self.phase == "liquid" and
-                key == "liquid_transport_coefficients"
-            ):
-                # ! unit check
-                if unit.lower() not in ("m/s", "meter per second"):
-                    raise ValueError(
-                        f"Unsupported unit '{unit}' for liquid transport coefficient of component '{comp_id}' in '{key}'. "
-                        "Use 'm/s' (meter per second)."
-                    )
-
-                # ! no conversion needed for m/s
-            else:
-                raise ValueError(
-                    f"Invalid transport coefficient key '{key}' for phase '{self.phase}'."
-                )
+            value = self._normalize_transport_coefficient_value(
+                value=value,
+                unit=unit,
+                key=key,
+                comp_id=comp_id,
+            )
 
             # set
             coeffs.append(value)
