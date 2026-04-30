@@ -9,6 +9,7 @@ from ..models.heat import HeatTransferOptions
 from ..utils.unit_tools import to_W_per_m2_K
 from .mc import MembraneCore
 from ..models.hfm import HollowFiberMembraneOptions
+from .hfm_module import HFMModule
 
 
 # NOTE: logger setup
@@ -279,7 +280,8 @@ class HFMCore(MembraneCore):
                     f"Missing mole fraction entry for component '{comp_id}' in '{key}'."
                 )
 
-            x_i = self._to_dimensionless_fraction(raw[comp_id], key=key, component_id=comp_id)
+            x_i = self._to_dimensionless_fraction(
+                raw[comp_id], key=key, component_id=comp_id)
             if x_i < 0.0:
                 raise ValueError(
                     f"Mole fraction for component '{comp_id}' in '{key}' must be non-negative."
