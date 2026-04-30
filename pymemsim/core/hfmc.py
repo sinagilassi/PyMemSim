@@ -9,7 +9,7 @@ import pycuc
 from ..models.heat import HeatTransferOptions
 from ..utils.unit_tools import to_W_per_m2_K
 from .mc import MembraneCore
-from ..models.hfm import HollowFiberMembraneOptions
+from ..models.hfm import HollowFiberMembraneOptions, HollowFiberMembraneModuleGeometry
 from .hfm_module import HFMModule
 
 
@@ -408,38 +408,56 @@ class HFMCore(MembraneCore):
     # SECTION: membrane parameter configuration
     # NOTE: configure membrane area-per-length either directly or via module geometry.
     def _config_membrane_area_per_length(self) -> float:
+        # case 1
         direct_key = "membrane_area_per_length"
+        # case 2
         geometry_keys = (
             "number_of_fibers",
             "fiber_outer_diameter",
             "fiber_inner_diameter",
             "fiber_length",
-            "shell_diameter",
+            "module_diameter",
+        )
+        # case 3
+        geometry_key = "module_geometry"
+
+        # check availability of direct area-per-length input and geometry-based inputs
+        has_direct = direct_key in self.model_inputs_keys
+        has_geometry = geometry_key in self.model_inputs_keys
+        has_any_geometry = any(
+            k in self.model_inputs_keys for k in geometry_keys
         )
 
-        has_direct = direct_key in self.model_inputs_keys
-        has_any_geometry = any(
-            k in self.model_inputs_keys for k in geometry_keys)
-
-        if has_direct and has_any_geometry:
+        # >> check
+        if (
+            has_direct and
+            has_any_geometry and
+            has_geometry
+        ):
             raise ValueError(
                 "Ambiguous membrane geometry specification. Use either "
                 "'membrane_area_per_length' directly OR the geometry set "
                 "('number_of_fibers', 'fiber_outer_diameter', 'fiber_inner_diameter', "
-                "'fiber_length', 'shell_diameter'), not both."
+                "'fiber_length', 'module_diameter'), not both."
             )
 
+        # NOTE: case 1: direct area-per-length input with unit handling.
         if has_direct:
             return self._parse_direct_membrane_area_per_length(direct_key)
 
+        # NOTE: case 2: retrieve geometry inputs from separate keys and calculate area-per-length.
         if has_any_geometry:
             return self._calculate_membrane_area_per_length_from_geometry(geometry_keys)
+
+        # NOTE: case 3: retrieve geometry from nested model and calculate area-per-length.
+        if has_geometry:
+            return self._calculate_membrane_area_per_length_from_geometry_model("module_geometry")
 
         raise ValueError(
             "Membrane area configuration is missing. Provide either "
             "'membrane_area_per_length' or the geometry set "
             "('number_of_fibers', 'fiber_outer_diameter', 'fiber_inner_diameter', "
-            "'fiber_length', 'shell_diameter')."
+            "'fiber_length', 'module_diameter')."
         )
 
     # ! parsing direct area-per-length input with unit handling (expects SI-equivalent units)
@@ -474,6 +492,28 @@ class HFMCore(MembraneCore):
             fiber_inner_diameter=self.model_inputs["fiber_inner_diameter"],
             fiber_length=self.model_inputs["fiber_length"],
             module_diameter=self.model_inputs["module_diameter"],
+        )
+        return float(module.properties["area_per_unit_length"])
+
+    # ! calculating area-per-length from geometry model
+    def _calculate_membrane_area_per_length_from_geometry_model(self, geometry_key: str) -> float:
+        if geometry_key not in self.model_inputs_keys:
+            raise ValueError(
+                f"Membrane geometry model '{geometry_key}' is missing from model_inputs."
+            )
+        geometry_model = self.model_inputs[geometry_key]
+        if not isinstance(geometry_model, HollowFiberMembraneModuleGeometry):
+            raise ValueError(
+                f"'{geometry_key}' must be an instance of HollowFiberMembraneModuleGeometry."
+            )
+
+        # create hfm module
+        module = HFMModule(
+            number_of_fibers=geometry_model.number_of_fibers,
+            fiber_outer_diameter=geometry_model.fiber_outer_diameter,
+            fiber_inner_diameter=geometry_model.fiber_inner_diameter,
+            fiber_length=geometry_model.fiber_length,
+            module_diameter=geometry_model.module_diameter,
         )
         return float(module.properties["area_per_unit_length"])
 
