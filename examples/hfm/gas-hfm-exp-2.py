@@ -84,7 +84,8 @@ gas_transport_coefficients = {
     "CH4-g": CustomProp(value=8.81*3.35e-10, unit="mol/s.m2.Pa"),
 }
 
-model_inputs = {
+# ? case 1: provide membrane surface area per unit length directly as an input
+model_inputs_1 = {
     # NOTE: dual-side inlet specs
     # ! feed
     "feed_inlet_flow": feed_inlet_flow,
@@ -95,13 +96,40 @@ model_inputs = {
     "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
     "permeate_pressure": CustomProp(value=101, unit="kPa"),
     # NOTE: membrane parameters
-    "membrane_area_per_length": CustomProp(value=0.231, unit="m2/m"),
+    "membrane_area_per_length": CustomProp(value=0.231, unit="m"),
     # NOTE: heat transfer parameters
     "overall_heat_transfer_coefficient": CustomProp(value=20.0, unit="W/m2.K"),
     "q_ext_feed": CustomProp(value=0.0, unit="W/m2"),
     "q_ext_permeate": CustomProp(value=0.0, unit="W/m2"),
     "gas_transport_coefficients": gas_transport_coefficients,
 }
+
+# ? case 2: use same inputs but with direct area-per-length input instead of geometry-based calculation
+model_inputs_2 = {
+    # NOTE: dual-side inlet specs
+    # ! feed
+    "feed_inlet_flow": feed_inlet_flow,
+    "feed_mole_fractions": feed_mole_fractions,
+    "feed_inlet_temperature": Temperature(value=338.15, unit="K"),
+    "feed_pressure": CustomProp(value=405, unit="kPa"),
+    # ! permeate
+    "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
+    "permeate_pressure": CustomProp(value=101, unit="kPa"),
+    # NOTE: membrane module geometry inputs (used to calculate area-per-length internally)
+    "number_of_fibers": CustomProp(value=100, unit=""),
+    "fiber_inner_diameter": CustomProp(value=0.0389, unit="cm"),
+    "fiber_outer_diameter": CustomProp(value=0.0735, unit="cm"),
+    "fiber_length": CustomProp(value=15, unit="cm"),
+    "module_diameter": CustomProp(value=1, unit="cm"),
+    # NOTE: heat transfer parameters
+    "overall_heat_transfer_coefficient": CustomProp(value=20.0, unit="W/m2.K"),
+    "q_ext_feed": CustomProp(value=0.0, unit="W/m2"),
+    "q_ext_permeate": CustomProp(value=0.0, unit="W/m2"),
+    "gas_transport_coefficients": gas_transport_coefficients,
+}
+
+# select which model inputs to use for this run
+model_inputs = model_inputs_1
 
 COUNTERCURRENT_METHOD = "bvp"  # "bvp" | "shooting"
 
