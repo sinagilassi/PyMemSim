@@ -2,6 +2,7 @@
 import logging
 import numpy as np
 from collections.abc import Mapping
+from types import SimpleNamespace
 from typing import Any, Dict, List
 from pythermodb_settings.models import Component, ComponentKey, Temperature
 # locals
@@ -116,9 +117,11 @@ class HFMCore(MembraneCore):
             fallback_value_Pa=float(self.feed_pressure),
         )
 
-        # SECTION: membrane transport and thermal parameters
+        # SECTION: membrane module properties
         # ! membrane area per unit length [m] (= m2/m)
         self.membrane_area_per_length = self._config_membrane_area_per_length()
+
+        # SECTION: membrane transport and thermal parameters
         # ! overall heat-transfer coefficient [W/m2.K]
         self.overall_heat_transfer_coefficient = self._config_optional_per_area_u(
             key="overall_heat_transfer_coefficient",
@@ -403,38 +406,74 @@ class HFMCore(MembraneCore):
         return float(fallback_value_Pa)
 
     # SECTION: membrane parameter configuration
-    # NOTE: configure membrane area-per-length (SI-equivalent units only).
+    # NOTE: configure membrane area-per-length either directly or via module geometry.
     def _config_membrane_area_per_length(self) -> float:
-        key = "membrane_area_per_length"
-        if key not in self.model_inputs_keys:
+        direct_key = "membrane_area_per_length"
+        geometry_keys = (
+            "number_of_fibers",
+            "fiber_outer_diameter",
+            "fiber_inner_diameter",
+            "fiber_length",
+            "shell_diameter",
+        )
+
+        has_direct = direct_key in self.model_inputs_keys
+        has_any_geometry = any(
+            k in self.model_inputs_keys for k in geometry_keys)
+
+        if has_direct and has_any_geometry:
             raise ValueError(
-                "membrane_area_per_length must be provided in model_inputs."
+                "Ambiguous membrane geometry specification. Use either "
+                "'membrane_area_per_length' directly OR the geometry set "
+                "('number_of_fibers', 'fiber_outer_diameter', 'fiber_inner_diameter', "
+                "'fiber_length', 'shell_diameter'), not both."
             )
 
+        if has_direct:
+            return self._parse_direct_membrane_area_per_length(direct_key)
+
+        if has_any_geometry:
+            return self._calculate_membrane_area_per_length_from_geometry(geometry_keys)
+
+        raise ValueError(
+            "Membrane area configuration is missing. Provide either "
+            "'membrane_area_per_length' or the geometry set "
+            "('number_of_fibers', 'fiber_outer_diameter', 'fiber_inner_diameter', "
+            "'fiber_length', 'shell_diameter')."
+        )
+
+    # ! parsing direct area-per-length input with unit handling (expects SI-equivalent units)
+    def _parse_direct_membrane_area_per_length(self, key: str) -> float:
         raw = self.model_inputs[key]
-        # ! pydantic-like object with .value/.unit
-        if hasattr(raw, "value"):
-            value = float(raw.value)
-            unit = str(getattr(raw, "unit", "")).strip()
-        # ! mapping input {'value', 'unit'}
-        elif isinstance(raw, Mapping):
-            if "value" not in raw:
-                raise ValueError(
-                    "membrane_area_per_length mapping must contain 'value'.")
-            value = float(raw["value"])
-            unit = str(raw.get("unit", "")).strip()
-        # ! bare numeric (assumed SI-equivalent)
-        else:
-            value = float(raw)
-            unit = ""
+        raw_value, raw_unit = self._extract_value_unit(raw)
+        unit = str(raw_unit).strip()
 
         # NOTE: area-per-length has SI unit m (equivalent to m2/m).
         if unit in ("", "m", "m2/m", "m^2/m"):
-            return value
+            return float(raw_value)
 
         raise ValueError(
             "Unsupported unit for membrane_area_per_length. Use SI-equivalent units: 'm' or 'm2/m'."
         )
+
+    # ! calculating area-per-length from geometry inputs using HFMModule properties
+    def _calculate_membrane_area_per_length_from_geometry(self, geometry_keys: tuple[str, ...]) -> float:
+        missing = [
+            key for key in geometry_keys if key not in self.model_inputs_keys]
+        if len(missing) > 0:
+            raise ValueError(
+                "Incomplete membrane geometry specification. Missing keys: "
+                f"{missing}"
+            )
+
+        module = HFMModule(
+            number_of_fibers=self.model_inputs["number_of_fibers"],
+            fiber_outer_diameter=self.model_inputs["fiber_outer_diameter"],
+            fiber_inner_diameter=self.model_inputs["fiber_inner_diameter"],
+            fiber_length=self.model_inputs["fiber_length"],
+            module_diameter=self.model_inputs["module_diameter"],
+        )
+        return float(module.properties["area_per_unit_length"])
 
     # NOTE: configure optional overall heat-transfer coefficient [W/m2.K].
     def _config_optional_per_area_u(self, key: str, default_value: float) -> float:
