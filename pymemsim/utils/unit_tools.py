@@ -1,6 +1,10 @@
 # import libs
 import logging
 import pycuc
+from pythermodb_settings.models import CustomProp
+
+# NOTE: logger setup
+logger = logging.getLogger(__name__)
 
 
 def to_m(value: float, unit: str) -> float:
@@ -343,3 +347,35 @@ def to_mol_per_s(value: float, unit: str) -> float:
         # fallback to raw value for unit systems that are already mol/s but not
         # explicitly recognized by converter
         return float(value)
+
+# SECTION: Convert permeance GPU to mol/s.m2.Pa
+
+
+def from_gpu_to_mol_per_s_m2_Pa(
+    permeance_gpu: CustomProp,
+    conversion_factor: float = 3.348e-10
+) -> float:
+    """
+    Convert permeance from GPU (Gas Permeation Unit) to mol/s.m2.Pa.
+
+    Parameters
+    ----------
+    permeance_gpu : CustomProp
+        Permeance in GPU (Gas Permeation Unit).
+    conversion_factor : float, optional
+        Conversion factor from GPU to mol/s.m2.Pa (default is 3.348e-10).
+
+    Returns
+    -------
+    float
+        Permeance in mol/s.m2.Pa.
+    """
+    # check if the input permeance has the expected unit (GPU)
+    if permeance_gpu.unit != 'GPU':
+        raise ValueError(
+            f"Expected permeance unit to be 'GPU', but got '{permeance_gpu.unit}'.")
+
+    # calculate permeance in mol/s.m2.Pa
+    permeance_mol_per_s_m2_Pa = permeance_gpu.value * conversion_factor
+
+    return permeance_mol_per_s_m2_Pa

@@ -115,5 +115,192 @@ def calculate_total_surface_area(
 
 
 # SECTION: calculate packing fraction
+def calculate_packing_fraction(
+        number_of_fibers: CustomProp,
+        fiber_outer_diameter: CustomProp,
+        module_inner_diameter: CustomProp,
+) -> CustomProp:
+    """
+    Calculate packing fraction of hollow fiber module.
+
+    phi = N * do^2 / dm^2
+
+    Returns dimensionless CustomProp.
+    """
+    try:
+        do_m = to_m(fiber_outer_diameter.value, fiber_outer_diameter.unit)
+        dm_m = to_m(module_inner_diameter.value, module_inner_diameter.unit)
+
+        if dm_m <= 0:
+            raise ValueError("module_inner_diameter must be positive.")
+
+        phi = number_of_fibers.value * do_m**2 / dm_m**2
+
+        return CustomProp(value=phi, unit='-')
+
+    except Exception as e:
+        logger.error(f"Error calculating packing fraction: {e}")
+        raise
 
 # SECTION: calculate porosity
+
+
+def calculate_porosity(
+        number_of_fibers: CustomProp,
+        fiber_outer_diameter: CustomProp,
+        module_inner_diameter: CustomProp,
+) -> CustomProp:
+    """
+    Calculate module porosity.
+
+    epsilon = 1 - phi
+    """
+    try:
+        phi = calculate_packing_fraction(
+            number_of_fibers,
+            fiber_outer_diameter,
+            module_inner_diameter
+        )
+
+        epsilon = 1.0 - phi.value
+
+        return CustomProp(value=epsilon, unit='-')
+
+    except Exception as e:
+        logger.error(f"Error calculating porosity: {e}")
+        raise
+
+# SECTION: calculate module cross-sectional area
+
+
+def calculate_module_cross_section_area(
+        module_inner_diameter: CustomProp,
+        output_unit: str = 'm2'
+) -> CustomProp:
+    """
+    Calculate module cross-sectional area.
+
+    A = pi * dm^2 / 4
+    """
+    try:
+        dm_m = to_m(module_inner_diameter.value, module_inner_diameter.unit)
+
+        area_m2 = np.pi * dm_m**2 / 4.0
+
+        if output_unit in ['m2', 'm^2']:
+            return CustomProp(value=area_m2, unit='m2')
+
+        return CustomProp(
+            value=pycuc.convert_from_to(area_m2, 'm2', output_unit),
+            unit=output_unit
+        )
+
+    except Exception as e:
+        logger.error(f"Error calculating module cross-sectional area: {e}")
+        raise
+
+# SECTION: calculate total fiber cross-sectional area
+
+
+def calculate_total_fiber_cross_section_area(
+        number_of_fibers: CustomProp,
+        fiber_outer_diameter: CustomProp,
+        output_unit: str = 'm2'
+) -> CustomProp:
+    """
+    Calculate total fiber cross-sectional area.
+
+    Af = N * pi * do^2 / 4
+    """
+    try:
+        do_m = to_m(fiber_outer_diameter.value, fiber_outer_diameter.unit)
+
+        area_m2 = number_of_fibers.value * np.pi * do_m**2 / 4.0
+
+        if output_unit in ['m2', 'm^2']:
+            return CustomProp(value=area_m2, unit='m2')
+
+        return CustomProp(
+            value=pycuc.convert_from_to(area_m2, 'm2', output_unit),
+            unit=output_unit
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error calculating total fiber cross-sectional area: {e}")
+        raise
+
+# SECTION: calculate module volume
+
+
+def calculate_module_volume(
+        module_inner_diameter: CustomProp,
+        membrane_length: CustomProp,
+        output_unit: str = 'm3'
+) -> CustomProp:
+    """
+    Calculate cylindrical module volume.
+
+    V = pi * dm^2 / 4 * L
+    """
+    try:
+        area = calculate_module_cross_section_area(
+            module_inner_diameter,
+            output_unit='m2'
+        )
+
+        length_m = to_m(membrane_length.value, membrane_length.unit)
+
+        volume_m3 = area.value * length_m
+
+        if output_unit in ['m3', 'm^3']:
+            return CustomProp(value=volume_m3, unit='m3')
+
+        return CustomProp(
+            value=pycuc.convert_from_to(volume_m3, 'm3', output_unit),
+            unit=output_unit
+        )
+
+    except Exception as e:
+        logger.error(f"Error calculating module volume: {e}")
+        raise
+
+# SECTION: calculate shell free cross-sectional area
+
+
+def calculate_shell_free_cross_section_area(
+        number_of_fibers: CustomProp,
+        fiber_outer_diameter: CustomProp,
+        module_inner_diameter: CustomProp,
+        output_unit: str = 'm2'
+) -> CustomProp:
+    """
+    Calculate free shell-side cross-sectional area.
+
+    As = A module - A fibers
+    """
+    try:
+        module_area = calculate_module_cross_section_area(
+            module_inner_diameter,
+            output_unit='m2'
+        )
+
+        fiber_area = calculate_total_fiber_cross_section_area(
+            number_of_fibers,
+            fiber_outer_diameter,
+            output_unit='m2'
+        )
+
+        shell_area_m2 = module_area.value - fiber_area.value
+
+        if output_unit in ['m2', 'm^2']:
+            return CustomProp(value=shell_area_m2, unit='m2')
+
+        return CustomProp(
+            value=pycuc.convert_from_to(shell_area_m2, 'm2', output_unit),
+            unit=output_unit
+        )
+
+    except Exception as e:
+        logger.error(f"Error calculating shell free cross-sectional area: {e}")
+        raise

@@ -1,14 +1,11 @@
 # import libs
 import logging
 import numpy as np
-from typing import Any, Dict, List, Optional, Tuple, cast
-from pythermodb_settings.models import Component, ComponentKey, CustomProp, Pressure, Temperature, CustomProperty
+from typing import Dict, List, Tuple
+from pythermodb_settings.models import Component, ComponentKey, CustomProp, CustomProperty
 from pythermodb_settings.utils import set_component_id
-from pyreactlab_core.models.reaction import Reaction
-from pyreactsim_core.models.rate_exp import ReactionRateExpression
-from pyreactsim_core.models.rate_exp_refs import rArgs, rParams, rRet, rXs
 # locals
-from .unit_tools import to_m3, to_K
+
 
 # NOTE: logger setup
 logger = logging.getLogger(__name__)
@@ -115,6 +112,3 @@ def set_component_X(
     X_spec_array = np.array(X_spec_list)
 
     return X_spec, X_spec_array
-
-
-# SECTION:
