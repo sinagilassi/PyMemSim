@@ -77,14 +77,14 @@ permeate_inlet_flows = {
     "C2H5OH-l": CustomProp(value=0.00, unit="mol/s"),
 }
 
-# NOTE: liquid transport coefficients k_i [placeholder units expected by model]
+# NOTE: liquid transport coefficients k_i [m/s]
 liquid_transport_coefficients = {
-    "CH3OH-l": CustomProp(value=2.0e-6, unit=""),
-    "H2O-l": CustomProp(value=1.0e-6, unit=""),
-    "CH3COOH-l": CustomProp(value=1.0e-6, unit=""),
-    "C3H6O2-l": CustomProp(value=5.0e-7, unit=""),
-    "H2-l": CustomProp(value=2.0e-6, unit=""),
-    "C2H5OH-l": CustomProp(value=1.0e-6, unit=""),
+    "CH3OH-l": CustomProp(value=2.0e-6, unit="m/s"),
+    "H2O-l": CustomProp(value=1.0e-6, unit="m/s"),
+    "CH3COOH-l": CustomProp(value=1.0e-6, unit="m/s"),
+    "C3H6O2-l": CustomProp(value=5.0e-7, unit="m/s"),
+    "H2-l": CustomProp(value=2.0e-6, unit="m/s"),
+    "C2H5OH-l": CustomProp(value=1.0e-6, unit="m/s"),
 }
 
 model_inputs = {
