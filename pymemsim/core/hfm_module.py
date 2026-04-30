@@ -13,14 +13,14 @@ class HFMModule:
         fiber_outer_diameter: CustomProp,
         fiber_inner_diameter: CustomProp,
         fiber_length: CustomProp,
-        shell_diameter: CustomProp
+        module_diameter: CustomProp
     ):
         # set attributes
         self.number_of_fibers = number_of_fibers
         self.fiber_outer_diameter = fiber_outer_diameter
         self.fiber_inner_diameter = fiber_inner_diameter
         self.fiber_length = fiber_length
-        self.shell_diameter = shell_diameter
+        self.module_diameter = module_diameter
 
         # calculate all properties of the membrane module
         self.properties = self.calculate()
@@ -51,7 +51,7 @@ class HFMModule:
 
         # NOTE: shell diameter
         # ! m
-        Ds = to_m(self.shell_diameter.value, self.shell_diameter.unit)
+        Ds = to_m(self.module_diameter.value, self.module_diameter.unit)
 
         # NOTE: cross-sectional area
         # ! m2
