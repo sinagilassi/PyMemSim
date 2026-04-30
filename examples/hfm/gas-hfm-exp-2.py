@@ -80,9 +80,16 @@ feed_mole_fractions = {
 # }
 
 # NOTE: gas transport coefficients Pi_i (Permeance) for each component i, in units of mol/s.m2.Pa
+# ! mol/s.m2.Pa
+# gas_transport_coefficients = {
+#     "CO2-g": CustomProp(value=31.60*3.35e-10, unit="mol/s.m2.Pa"),
+#     "CH4-g": CustomProp(value=8.81*3.35e-10, unit="mol/s.m2.Pa"),
+# }
+
+# ! gpu
 gas_transport_coefficients = {
-    "CO2-g": CustomProp(value=31.60*3.35e-10, unit="mol/s.m2.Pa"),
-    "CH4-g": CustomProp(value=8.81*3.35e-10, unit="mol/s.m2.Pa"),
+    "CO2-g": CustomProp(value=31.60, unit="GPU"),
+    "CH4-g": CustomProp(value=8.81, unit="GPU"),
 }
 
 # NOTE: membrane unit geometry
