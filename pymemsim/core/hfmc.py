@@ -2,9 +2,9 @@
 import logging
 import numpy as np
 from collections.abc import Mapping
-from types import SimpleNamespace
 from typing import Any, Dict, List
 from pythermodb_settings.models import Component, ComponentKey, Temperature
+import pycuc
 # locals
 from ..models.heat import HeatTransferOptions
 from ..utils.unit_tools import to_W_per_m2_K
@@ -449,12 +449,14 @@ class HFMCore(MembraneCore):
         unit = str(raw_unit).strip()
 
         # NOTE: area-per-length has SI unit m (equivalent to m2/m).
-        if unit in ("", "m", "m2/m", "m^2/m"):
+        if unit in ("", "m"):
             return float(raw_value)
-
-        raise ValueError(
-            "Unsupported unit for membrane_area_per_length. Use SI-equivalent units: 'm' or 'm2/m'."
-        )
+        else:
+            return pycuc.convert_from_to(
+                value=float(raw_value),
+                from_unit=unit,
+                to_unit="m",
+            )
 
     # ! calculating area-per-length from geometry inputs using HFMModule properties
     def _calculate_membrane_area_per_length_from_geometry(self, geometry_keys: tuple[str, ...]) -> float:
