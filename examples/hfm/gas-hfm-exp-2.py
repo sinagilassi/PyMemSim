@@ -10,10 +10,11 @@ from rich import print
 from examples.source.gas_load_model_source import model_source, CO2, CH4
 from examples.plot.plot_res import plot_hfm_result, plot_hfm_permeate_flow_profile
 from pymemsim.thermo import build_thermo_source
-from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult
+from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult, HollowFiberMembraneModuleGeometry
 from pymemsim import HFM, create_hfm_module
 from pymemsim.utils import analyze_hfm_result, print_hfm_result_tables
 from pymemsim.utils import Q_std_to_mol_s, to_m3_per_s
+
 
 # NOTE: example source and kinetics
 # ! add project root and examples root to import path for standalone script execution
@@ -84,6 +85,15 @@ gas_transport_coefficients = {
     "CH4-g": CustomProp(value=8.81*3.35e-10, unit="mol/s.m2.Pa"),
 }
 
+# NOTE: membrane unit geometry
+module_geometry = HollowFiberMembraneModuleGeometry(
+    number_of_fibers=CustomProp(value=100, unit=""),
+    fiber_length=CustomProp(value=15, unit="cm"),
+    fiber_inner_diameter=CustomProp(value=0.0389, unit="cm"),
+    fiber_outer_diameter=CustomProp(value=0.0735, unit="cm"),
+    module_diameter=CustomProp(value=1, unit="cm"),
+)
+
 # ? case 1: provide membrane surface area per unit length directly as an input
 model_inputs_1 = {
     # NOTE: dual-side inlet specs
@@ -128,8 +138,28 @@ model_inputs_2 = {
     "gas_transport_coefficients": gas_transport_coefficients,
 }
 
+# ? case 3: use module geometry model
+model_inputs_3 = {
+    # NOTE: dual-side inlet specs
+    # ! feed
+    "feed_inlet_flow": feed_inlet_flow,
+    "feed_mole_fractions": feed_mole_fractions,
+    "feed_inlet_temperature": Temperature(value=338.15, unit="K"),
+    "feed_pressure": CustomProp(value=405, unit="kPa"),
+    # ! permeate
+    "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
+    "permeate_pressure": CustomProp(value=101, unit="kPa"),
+    # NOTE: membrane module geometry inputs (used to calculate area-per-length internally)
+    "module_geometry": module_geometry,
+    # NOTE: heat transfer parameters
+    "overall_heat_transfer_coefficient": CustomProp(value=20.0, unit="W/m2.K"),
+    "q_ext_feed": CustomProp(value=0.0, unit="W/m2"),
+    "q_ext_permeate": CustomProp(value=0.0, unit="W/m2"),
+    "gas_transport_coefficients": gas_transport_coefficients,
+}
+
 # select which model inputs to use for this run
-model_inputs = model_inputs_1
+model_inputs = model_inputs_3
 
 COUNTERCURRENT_METHOD = "bvp"  # "bvp" | "shooting"
 
@@ -228,6 +258,8 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
         hfm_module=hfm_module,
         target_component="CO2-g",
     )
+    print("\n[bold magenta]Analysis of results:[/bold magenta]")
+    print(analysis)
     print_hfm_result_tables(analysis)
 
     return simulation_results
