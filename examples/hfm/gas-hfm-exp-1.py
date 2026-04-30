@@ -83,7 +83,7 @@ model_inputs = {
     "feed_pressure": CustomProp(value=404, unit="kPa"),
     "permeate_pressure": CustomProp(value=101, unit="kPa"),
     # NOTE: membrane parameters
-    "membrane_area_per_length": CustomProp(value=0.05058, unit="m2/m"),
+    "membrane_area_per_length": CustomProp(value=0.05058, unit="m"),
     "overall_heat_transfer_coefficient": CustomProp(value=20.0, unit="W/m2.K"),
     "q_ext_feed": CustomProp(value=0.0, unit="W/m2"),
     "q_ext_permeate": CustomProp(value=0.0, unit="W/m2"),
