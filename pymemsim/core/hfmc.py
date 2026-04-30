@@ -3,11 +3,11 @@ import logging
 import numpy as np
 from collections.abc import Mapping
 from typing import Any, Dict, List
-from pythermodb_settings.models import Component, ComponentKey, Temperature
+from pythermodb_settings.models import Component, ComponentKey, Temperature, CustomProp
 import pycuc
 # locals
 from ..models.heat import HeatTransferOptions
-from ..utils.unit_tools import to_W_per_m2_K
+from ..utils.unit_tools import to_W_per_m2_K, from_gpu_to_mol_per_s_m2_Pa
 from .mc import MembraneCore
 from ..models.hfm import HollowFiberMembraneOptions, HollowFiberMembraneModuleGeometry
 from .hfm_module import HFMModule
@@ -45,18 +45,24 @@ class HFMCore(MembraneCore):
         self.flow_pattern = self._normalize_flow_pattern(
             unit_options.flow_pattern)
         self.operation_mode = getattr(
-            unit_options, "operation_mode", "constant_pressure")
+            unit_options, "operation_mode", "constant_pressure"
+        )
         self.feed_pressure_mode = getattr(
-            unit_options, "feed_pressure_mode", "constant")
+            unit_options, "feed_pressure_mode", "constant"
+        )
         self.permeate_pressure_mode = getattr(
-            unit_options, "permeate_pressure_mode", "constant")
+            unit_options, "permeate_pressure_mode", "constant"
+        )
         self.gas_model = unit_options.gas_model
         self.gas_heat_capacity_mode = unit_options.gas_heat_capacity_mode
         self.liquid_heat_capacity_mode = unit_options.liquid_heat_capacity_mode
         self.liquid_density_mode = unit_options.liquid_density_mode
 
         # NOTE: this pass supports only constant pressure on both sides.
-        if self.feed_pressure_mode != "constant" or self.permeate_pressure_mode != "constant":
+        if (
+            self.feed_pressure_mode != "constant" or
+            self.permeate_pressure_mode != "constant"
+        ):
             raise NotImplementedError(
                 "HFM currently supports only constant feed/permeate pressure modes."
             )
@@ -577,19 +583,70 @@ class HFMCore(MembraneCore):
 
             item = raw[comp_id]
             # ! pydantic-like object with .value
-            if hasattr(item, "value"):
+            if (
+                hasattr(item, "value") and
+                hasattr(item, "unit")
+            ):
+                # value
                 value = float(item.value)
+                # unit
+                unit = str(item.value).strip()
             # ! mapping input {'value', ...}
             elif isinstance(item, Mapping):
                 if "value" not in item:
                     raise ValueError(
                         f"Transport coefficient for '{comp_id}' in '{key}' must contain 'value'."
                     )
+
+                if "unit" not in item:
+                    raise ValueError(
+                        f"Transport coefficient for '{comp_id}' in '{key}' must contain 'unit'."
+                    )
+
+                # set
                 value = float(item["value"])
+                unit = str(item["unit"]).strip()
             # ! bare numeric
             else:
-                value = float(item)
+                raise ValueError(
+                    f"Transport coefficient for '{comp_id}' in '{key}' must be a numeric value or an object with a 'value' attribute."
+                )
 
+            # NOTE: check unit based on phase and key conventions
+            if (
+                self.phase == "gas" and
+                key == "gas_transport_coefficients"
+            ):
+                # ! unit check
+                if unit.lower() not in ("gpu", "gas permeation unit", "mol/s.m2.pa"):
+                    raise ValueError(
+                        f"Unsupported unit '{unit}' for gas transport coefficient of component '{comp_id}' in '{key}'. "
+                        "Use 'GPU' (Gas Permeation Unit) or 'mol/s.m2.Pa'."
+                    )
+
+                # ! unit conversion
+                if unit.lower() in ("gpu", "gas permeation unit"):
+                    value = from_gpu_to_mol_per_s_m2_Pa(
+                        CustomProp(value=value, unit=unit)
+                    )
+            elif (
+                self.phase == "liquid" and
+                key == "liquid_transport_coefficients"
+            ):
+                # ! unit check
+                if unit.lower() not in ("m/s", "meter per second"):
+                    raise ValueError(
+                        f"Unsupported unit '{unit}' for liquid transport coefficient of component '{comp_id}' in '{key}'. "
+                        "Use 'm/s' (meter per second)."
+                    )
+
+                # ! no conversion needed for m/s
+            else:
+                raise ValueError(
+                    f"Invalid transport coefficient key '{key}' for phase '{self.phase}'."
+                )
+
+            # set
             coeffs.append(value)
 
         # NOTE: enforce completeness only when required for active phase
