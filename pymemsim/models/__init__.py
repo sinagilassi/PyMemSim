@@ -2,7 +2,7 @@
 from .ref import MembraneOptions, GasModel, UnitPhase
 
 # NOTE: hfm
-from .hfm import HollowFiberMembraneOptions
+from .hfm import HollowFiberMembraneOptions, HollowFiberMembraneModuleGeometry
 
 # NOTE: heat
 from .heat import HeatTransferOptions
@@ -17,6 +17,7 @@ __all__ = [
     "UnitPhase",
     # hfm
     "HollowFiberMembraneOptions",
+    "HollowFiberMembraneModuleGeometry",
     # heat
     "HeatTransferOptions",
     # results
