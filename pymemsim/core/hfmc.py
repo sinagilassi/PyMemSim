@@ -428,19 +428,6 @@ class HFMCore(MembraneCore):
             k in self.model_inputs_keys for k in geometry_keys
         )
 
-        # >> check
-        if (
-            has_direct and
-            has_any_geometry and
-            has_geometry
-        ):
-            raise ValueError(
-                "Ambiguous membrane geometry specification. Use either "
-                "'membrane_area_per_length' directly OR the geometry set "
-                "('number_of_fibers', 'fiber_outer_diameter', 'fiber_inner_diameter', "
-                "'fiber_length', 'module_diameter'), not both."
-            )
-
         # NOTE: case 1: direct area-per-length input with unit handling.
         if has_direct:
             return self._parse_direct_membrane_area_per_length(direct_key)
@@ -454,10 +441,8 @@ class HFMCore(MembraneCore):
             return self._calculate_membrane_area_per_length_from_geometry_model("module_geometry")
 
         raise ValueError(
-            "Membrane area configuration is missing. Provide either "
-            "'membrane_area_per_length' or the geometry set "
-            "('number_of_fibers', 'fiber_outer_diameter', 'fiber_inner_diameter', "
-            "'fiber_length', 'module_diameter')."
+            "Membrane area per unit length must be specified either directly via "
+            f"'{direct_key}' or indirectly via geometry inputs ({geometry_keys} or '{geometry_key}')."
         )
 
     # ! parsing direct area-per-length input with unit handling (expects SI-equivalent units)
