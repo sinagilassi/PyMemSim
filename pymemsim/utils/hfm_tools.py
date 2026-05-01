@@ -272,6 +272,20 @@ def calculate_total_fiber_cross_section_area(
     Calculate total fiber cross-sectional area.
 
     Af = N * pi * do^2 / 4
+
+    Parameters
+    ----------
+    number_of_fibers : CustomProp
+        Number of fibers in the module.
+    fiber_outer_diameter : CustomProp
+        Outer diameter of the fibers.
+    output_unit : str, optional
+        Desired output unit for the total fiber cross-sectional area (default is 'm2').
+
+    Returns
+    -------
+    CustomProp
+        Total fiber cross-sectional area, in the specified output unit.
     """
     try:
         do_m = to_m(fiber_outer_diameter.value, fiber_outer_diameter.unit)
@@ -449,7 +463,23 @@ def calculate_flow_rate_from_velocity(
         output_unit: str = 'm3/s'
 ) -> CustomProp:
     """
+    Calculate volumetric flow rate from velocity and cross-sectional area.
+
     Q = u * A
+
+    Parameters
+    ----------
+    cross_section_area : CustomProp
+        Cross-sectional area of the flow channel.
+    velocity : CustomProp
+        Fluid velocity.
+    output_unit : str, optional
+        Desired output unit for the flow rate (default is 'm3/s').
+
+    Returns
+    -------
+    CustomProp
+        Volumetric flow rate, in the specified output unit.
     """
     try:
         area_m2 = pycuc.convert_from_to(
@@ -487,9 +517,27 @@ def calculate_molar_flow_rate_ideal_gas(
         output_unit: str = 'mol/s'
 ) -> CustomProp:
     """
-    Ideal gas conversion:
+    Calculate molar flow rate from volumetric flow rate using the ideal gas law.
 
     F = P Q / R T
+
+    Parameters
+    ----------
+    volumetric_flow_rate : CustomProp
+        Volumetric flow rate of the gas.
+    pressure : CustomProp
+        Absolute pressure of the gas.
+    temperature : CustomProp
+        Absolute temperature of the gas.
+    universal_gas_constant : float, optional
+        Universal gas constant in J/mol.K (default is 8.314).
+    output_unit : str, optional
+        Desired output unit for the molar flow rate (default is 'mol/s').
+
+    Returns
+    -------
+    CustomProp
+        Molar flow rate, in the specified output unit.
     """
     try:
         q_m3_s = pycuc.convert_from_to(
@@ -535,9 +583,27 @@ def calculate_volumetric_flow_rate_ideal_gas(
         output_unit: str = 'm3/s'
 ) -> CustomProp:
     """
-    Ideal gas conversion:
+    Calculate volumetric flow rate from molar flow rate using the ideal gas law.
 
     Q = F R T / P
+
+    Parameters
+    ----------
+    molar_flow_rate : CustomProp
+        Molar flow rate of the gas.
+    pressure : CustomProp
+        Absolute pressure of the gas.
+    temperature : CustomProp
+        Absolute temperature of the gas.
+    universal_gas_constant : float, optional
+        Universal gas constant in J/mol.K (default is 8.314).
+    output_unit : str, optional
+        Desired output unit for the volumetric flow rate (default is 'm3/s').
+
+    Returns
+    -------
+    CustomProp
+        Volumetric flow rate, in the specified output unit.
     """
     try:
         f_mol_s = pycuc.convert_from_to(
@@ -584,9 +650,29 @@ def calculate_laminar_lumen_qmax_from_pressure_drop(
         output_unit: str = 'm3/s'
 ) -> CustomProp:
     """
-    Hagen-Poiseuille limit for lumen-side laminar flow.
+    Calculate maximum lumen-side flow rate from pressure drop using the Hagen-Poiseuille equation.
 
     Q_total = ΔP * pi * di^4 * N / (128 * mu * L)
+
+    Parameters
+    ----------
+    number_of_fibers : CustomProp
+        Number of fibers in the module.
+    fiber_inner_diameter : CustomProp
+        Inner diameter of the fibers.
+    membrane_length : CustomProp
+        Length of the membrane fibers.
+    viscosity : CustomProp
+        Dynamic viscosity of the fluid.
+    max_pressure_drop : CustomProp
+        Maximum allowable pressure drop along the fiber length.
+    output_unit : str, optional
+        Desired output unit for the flow rate (default is 'm3/s').
+
+    Returns
+    -------
+    CustomProp
+        Maximum allowable total volumetric flow rate, in the specified output unit.
     """
     try:
         di_m = to_m(fiber_inner_diameter.value, fiber_inner_diameter.unit)
@@ -747,6 +833,55 @@ def calculate_hfm_feed_flow_rate_bounds(
 
     Upper bound:
         min(max velocity limit, pressure-drop limit)
+
+    Parameters
+    ----------
+    number_of_fibers : CustomProp
+        Number of fibers in the module.
+    fiber_inner_diameter : CustomProp
+        Inner diameter of the fibers.
+    fiber_outer_diameter : CustomProp
+        Outer diameter of the fibers.
+    membrane_length : CustomProp
+        Length of the membrane fibers.
+    feed_pressure : CustomProp
+        Pressure on the feed side.
+    feed_temperature : CustomProp
+        Temperature of the feed gas.
+    permeate_pressure : CustomProp
+        Pressure on the permeate side.
+    viscosity : CustomProp
+        Dynamic viscosity of the feed gas.
+    permeance : dict
+        Dictionary of permeance values for each component, in units of mol/s.m2.Pa or GPU.
+    feed_mole_fraction : dict
+        Dictionary of mole fractions for each component in the feed (must sum to 1).
+    velocity_min : CustomProp, optional
+        Minimum lumen-side fluid velocity (default is 0.01 m/s).
+    velocity_max : CustomProp, optional
+        Maximum lumen-side fluid velocity (default is 10.0 m/s).
+    max_pressure_drop : CustomProp, optional
+        Maximum allowable pressure drop along the fiber length (default is 20000 Pa).
+    theta_max : float, optional
+        Maximum allowable stage cut used to set the lower flow-rate bound (default is 0.8).
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+        - ``lumen_cross_section_area`` : total lumen flow area (m2)
+        - ``q_min_velocity`` : minimum flow rate from velocity constraint (m3/s)
+        - ``q_max_velocity`` : maximum flow rate from velocity constraint (m3/s)
+        - ``q_max_pressure_drop`` : maximum flow rate from pressure-drop constraint (m3/s)
+        - ``q_min_capacity`` : minimum flow rate from membrane capacity constraint (m3/s)
+        - ``q_min_recommended`` : final recommended minimum volumetric flow rate (m3/s)
+        - ``q_max_recommended`` : final recommended maximum volumetric flow rate (m3/s)
+        - ``f_min_recommended`` : final recommended minimum molar flow rate (mol/s)
+        - ``f_max_recommended`` : final recommended maximum molar flow rate (mol/s)
+        - ``estimated_total_permeation_capacity`` : total permeation capacity (mol/s)
+        - ``estimated_component_capacity`` : per-component permeation capacity (mol/s)
+        - ``theta_max`` : stage-cut limit used
+        - ``is_feasible_range`` : True if the recommended min < max
     """
     try:
         if not 0.0 < theta_max < 1.0:
@@ -870,6 +1005,27 @@ def validate_hfm_feed_flow_rate(
 ) -> bool:
     """
     Validate feed molar flow rate before solving the HFM model.
+
+    Raises a ValueError if the feed flow rate falls outside the recommended
+    bounds computed by calculate_hfm_feed_flow_rate_bounds().
+
+    Parameters
+    ----------
+    feed_flow_rate : CustomProp
+        Feed molar flow rate to validate.
+    bounds : dict
+        Dictionary returned by calculate_hfm_feed_flow_rate_bounds(), containing
+        'f_min_recommended' and 'f_max_recommended' keys.
+
+    Returns
+    -------
+    bool
+        True if the feed flow rate is within the recommended bounds.
+
+    Raises
+    ------
+    ValueError
+        If the feed flow rate is below the minimum or above the maximum recommended value.
     """
     try:
         f_mol_s = pycuc.convert_from_to(
@@ -907,7 +1063,27 @@ def validate_stage_cut(
         theta_max: float = 0.95,
 ) -> bool:
     """
-    Final physical validation after solving.
+    Validate the stage cut after solving the HFM model.
+
+    Checks that the stage cut is physically meaningful (non-negative, at most 1)
+    and does not exceed the recommended maximum.
+
+    Parameters
+    ----------
+    stage_cut : float
+        Stage cut (theta = permeate flow / feed flow), dimensionless.
+    theta_max : float, optional
+        Maximum allowable stage cut (default is 0.95).
+
+    Returns
+    -------
+    bool
+        True if the stage cut is within acceptable bounds.
+
+    Raises
+    ------
+    ValueError
+        If the stage cut is negative, greater than 1, or exceeds theta_max.
     """
     if stage_cut < 0.0:
         raise ValueError("Stage cut is negative. Check flux sign convention.")
