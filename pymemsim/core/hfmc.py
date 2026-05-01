@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from collections.abc import Mapping
 from typing import Any, Dict, List
-from pythermodb_settings.models import Component, ComponentKey, Temperature, CustomProp
+from pythermodb_settings.models import Component, ComponentKey, Temperature, CustomProp, Pressure
 import pycuc
 # locals
 from ..models.heat import HeatTransferOptions
@@ -578,7 +578,8 @@ class HFMCore(MembraneCore):
                 )
             if unit_normalized in ("gpu", "gas permeation unit"):
                 return float(
-                    from_gpu_to_mol_per_s_m2_Pa(CustomProp(value=value, unit=unit))
+                    from_gpu_to_mol_per_s_m2_Pa(
+                        CustomProp(value=value, unit=unit))
                 )
             return float(value)
 

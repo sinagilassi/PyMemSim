@@ -4,7 +4,7 @@ import sys
 import warnings
 from pathlib import Path
 from typing import cast, Literal
-from pythermodb_settings.models import CustomProp, Temperature
+from pythermodb_settings.models import CustomProp, Temperature, Pressure
 from rich import print
 # ! locals
 from examples.source.gas_load_model_source import model_source, CO2, CH4
@@ -112,10 +112,10 @@ model_inputs_1 = {
     "feed_inlet_flow": feed_inlet_flow,
     "feed_mole_fractions": feed_mole_fractions,
     "feed_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "feed_pressure": CustomProp(value=405, unit="kPa"),
+    "feed_pressure": Pressure(value=405, unit="kPa"),
     # ! permeate
     "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "permeate_pressure": CustomProp(value=101, unit="kPa"),
+    "permeate_pressure": Pressure(value=101, unit="kPa"),
     # NOTE: membrane parameters
     "membrane_area_per_length": CustomProp(value=0.231, unit="m"),
     # NOTE: heat transfer parameters
@@ -132,10 +132,10 @@ model_inputs_2 = {
     "feed_inlet_flow": feed_inlet_flow,
     "feed_mole_fractions": feed_mole_fractions,
     "feed_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "feed_pressure": CustomProp(value=405, unit="kPa"),
+    "feed_pressure": Pressure(value=405, unit="kPa"),
     # ! permeate
     "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "permeate_pressure": CustomProp(value=101, unit="kPa"),
+    "permeate_pressure": Pressure(value=101, unit="kPa"),
     # NOTE: membrane module geometry inputs (used to calculate area-per-length internally)
     "number_of_fibers": CustomProp(value=100, unit=""),
     "fiber_inner_diameter": CustomProp(value=0.0389, unit="cm"),
@@ -156,10 +156,10 @@ model_inputs_3 = {
     "feed_inlet_flow": feed_inlet_flow,
     "feed_mole_fractions": feed_mole_fractions,
     "feed_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "feed_pressure": CustomProp(value=405, unit="kPa"),
+    "feed_pressure": Pressure(value=405, unit="kPa"),
     # ! permeate
     "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "permeate_pressure": CustomProp(value=101, unit="kPa"),
+    "permeate_pressure": Pressure(value=101, unit="kPa"),
     # NOTE: membrane module geometry inputs (used to calculate area-per-length internally)
     "module_geometry": module_geometry,
     # NOTE: heat transfer parameters
