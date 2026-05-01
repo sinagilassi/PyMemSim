@@ -69,7 +69,7 @@ def calculate_surface_area_per_unit_length(
 def calculate_total_surface_area(
         number_of_fibers: CustomProp,
         fiber_outer_diameter: CustomProp,
-        membrane_length: CustomProp,
+        fiber_length: CustomProp,
         output_unit: str = 'm2'
 ) -> CustomProp:
     """
@@ -81,7 +81,7 @@ def calculate_total_surface_area(
         The number of fibers in the membrane module.
     fiber_outer_diameter : CustomProp
         The outer diameter of the fibers in the membrane module.
-    membrane_length : CustomProp
+    fiber_length : CustomProp
         The length of the membrane fibers in the module.
     output_unit : str, optional
         The desired output unit for the total surface area (default is 'm2').
@@ -103,8 +103,8 @@ def calculate_total_surface_area(
         # convert membrane length to meters
         # ! m
         membrane_length_m = to_m(
-            membrane_length.value,
-            membrane_length.unit
+            fiber_length.value,
+            fiber_length.unit
         )
 
         # calculate total surface area
@@ -354,7 +354,7 @@ def calculate_lumen_cross_section_area(
 
 def calculate_module_volume(
         module_inner_diameter: CustomProp,
-        membrane_length: CustomProp,
+        fiber_length: CustomProp,
         output_unit: str = 'm3'
 ) -> CustomProp:
     """
@@ -366,7 +366,7 @@ def calculate_module_volume(
     ----------
     module_inner_diameter : CustomProp
         Inner diameter of the module.
-    membrane_length : CustomProp
+    fiber_length : CustomProp
         Length of the membrane fibers in the module.
     output_unit : str, optional
         Desired output unit for the module volume (default is 'm3').
@@ -382,7 +382,7 @@ def calculate_module_volume(
             output_unit='m2'
         )
 
-        length_m = to_m(membrane_length.value, membrane_length.unit)
+        length_m = to_m(fiber_length.value, fiber_length.unit)
 
         volume_m3 = area.value * length_m
 
@@ -644,7 +644,7 @@ def calculate_volumetric_flow_rate_ideal_gas(
 def calculate_laminar_lumen_qmax_from_pressure_drop(
         number_of_fibers: CustomProp,
         fiber_inner_diameter: CustomProp,
-        membrane_length: CustomProp,
+        fiber_length: CustomProp,
         viscosity: CustomProp,
         max_pressure_drop: CustomProp,
         output_unit: str = 'm3/s'
@@ -660,7 +660,7 @@ def calculate_laminar_lumen_qmax_from_pressure_drop(
         Number of fibers in the module.
     fiber_inner_diameter : CustomProp
         Inner diameter of the fibers.
-    membrane_length : CustomProp
+    fiber_length : CustomProp
         Length of the membrane fibers.
     viscosity : CustomProp
         Dynamic viscosity of the fluid.
@@ -676,7 +676,7 @@ def calculate_laminar_lumen_qmax_from_pressure_drop(
     """
     try:
         di_m = to_m(fiber_inner_diameter.value, fiber_inner_diameter.unit)
-        length_m = to_m(membrane_length.value, membrane_length.unit)
+        length_m = to_m(fiber_length.value, fiber_length.unit)
 
         mu_pa_s = pycuc.convert_from_to(
             viscosity.value,
@@ -714,11 +714,11 @@ def calculate_laminar_lumen_qmax_from_pressure_drop(
 def estimate_membrane_permeation_capacity(
         number_of_fibers: CustomProp,
         fiber_outer_diameter: CustomProp,
-        membrane_length: CustomProp,
+        fiber_length: CustomProp,
         feed_pressure: CustomProp,
         permeate_pressure: CustomProp,
         permeance: dict[str, CustomProp],
-        feed_mole_fraction: dict,
+        feed_mole_fraction: dict[str, CustomProp],
 ) -> Tuple[CustomProp, dict]:
     """
     Rough screening estimate:
@@ -738,7 +738,7 @@ def estimate_membrane_permeation_capacity(
         Number of fibers in the module.
     fiber_outer_diameter : CustomProp
         Outer diameter of the fibers.
-    membrane_length : CustomProp
+    fiber_length : CustomProp
         Length of the membrane fibers.
     feed_pressure : CustomProp
         Pressure on the feed side.
@@ -746,15 +746,17 @@ def estimate_membrane_permeation_capacity(
         Pressure on the permeate side.
     permeance : dict[str, CustomProp]
         Dictionary of permeance values for each component, in units of mol/s.m2.Pa or GPU.
-    feed_mole_fraction : dict
+    feed_mole_fraction : dict[str, CustomProp]
         Dictionary of mole fractions for each component in the feed.
     """
     try:
+        # calculate total membrane surface
+        # ! m2
         area = calculate_total_surface_area(
             number_of_fibers=number_of_fibers,
             fiber_outer_diameter=fiber_outer_diameter,
-            membrane_length=membrane_length,
-            output_unit='m'
+            fiber_length=fiber_length,
+            output_unit='m2'
         )
 
         # In your current file, total_surface_area uses unit='m'
@@ -791,7 +793,14 @@ def estimate_membrane_permeation_capacity(
                 # 1 GPU = 3.35e-10 mol/s.m2.Pa
                 Pi_value = Pi_value * 3.35e-10
 
-            yi = feed_mole_fraction.get(comp, 0.0)
+            yi_src = feed_mole_fraction.get(comp, None)
+            # >> check
+            if yi_src is None:
+                raise ValueError(
+                    f"Mole fraction for component {comp} not found in feed_mole_fraction dictionary.")
+
+            # set value
+            yi = yi_src.value
 
             driving_force = max(yi * pf_pa - 0.0 * pp_pa, 0.0)
 
@@ -813,13 +822,13 @@ def calculate_hfm_feed_flow_rate_bounds(
         number_of_fibers: CustomProp,
         fiber_inner_diameter: CustomProp,
         fiber_outer_diameter: CustomProp,
-        membrane_length: CustomProp,
+        fiber_length: CustomProp,
         feed_pressure: CustomProp,
         feed_temperature: CustomProp,
         permeate_pressure: CustomProp,
         viscosity: CustomProp,
-        permeance: dict,
-        feed_mole_fraction: dict,
+        permeance: dict[str, CustomProp],
+        feed_mole_fraction: dict[str, CustomProp],
         velocity_min: CustomProp = CustomProp(value=0.01, unit='m/s'),
         velocity_max: CustomProp = CustomProp(value=10.0, unit='m/s'),
         max_pressure_drop: CustomProp = CustomProp(value=20_000.0, unit='Pa'),
@@ -842,7 +851,7 @@ def calculate_hfm_feed_flow_rate_bounds(
         Inner diameter of the fibers.
     fiber_outer_diameter : CustomProp
         Outer diameter of the fibers.
-    membrane_length : CustomProp
+    fiber_length : CustomProp
         Length of the membrane fibers.
     feed_pressure : CustomProp
         Pressure on the feed side.
@@ -852,9 +861,9 @@ def calculate_hfm_feed_flow_rate_bounds(
         Pressure on the permeate side.
     viscosity : CustomProp
         Dynamic viscosity of the feed gas.
-    permeance : dict
+    permeance : dict[str, CustomProp]
         Dictionary of permeance values for each component, in units of mol/s.m2.Pa or GPU.
-    feed_mole_fraction : dict
+    feed_mole_fraction : dict[str, CustomProp]
         Dictionary of mole fractions for each component in the feed (must sum to 1).
     velocity_min : CustomProp, optional
         Minimum lumen-side fluid velocity (default is 0.01 m/s).
@@ -887,9 +896,6 @@ def calculate_hfm_feed_flow_rate_bounds(
         if not 0.0 < theta_max < 1.0:
             raise ValueError("theta_max must be between 0 and 1.")
 
-        if abs(sum(feed_mole_fraction.values()) - 1.0) > 1e-6:
-            raise ValueError("Feed mole fractions must sum to 1.")
-
         lumen_area = calculate_lumen_cross_section_area(
             number_of_fibers=number_of_fibers,
             fiber_inner_diameter=fiber_inner_diameter,
@@ -911,7 +917,7 @@ def calculate_hfm_feed_flow_rate_bounds(
         q_max_dp = calculate_laminar_lumen_qmax_from_pressure_drop(
             number_of_fibers=number_of_fibers,
             fiber_inner_diameter=fiber_inner_diameter,
-            membrane_length=membrane_length,
+            fiber_length=fiber_length,
             viscosity=viscosity,
             max_pressure_drop=max_pressure_drop,
             output_unit='m3/s'
@@ -920,7 +926,7 @@ def calculate_hfm_feed_flow_rate_bounds(
         total_capacity, component_capacity = estimate_membrane_permeation_capacity(
             number_of_fibers=number_of_fibers,
             fiber_outer_diameter=fiber_outer_diameter,
-            membrane_length=membrane_length,
+            fiber_length=fiber_length,
             feed_pressure=feed_pressure,
             permeate_pressure=permeate_pressure,
             permeance=permeance,
