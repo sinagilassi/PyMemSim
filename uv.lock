@@ -160,15 +160,15 @@ wheels = [
 
 [[package]]
 name = "pycuc"
-version = "2.7.1"
+version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pandas" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ae/eb/7defb11a2409a5550efccc8e1279cb91d40bf7ba1920e67798f3a54eb138/pycuc-2.7.1.tar.gz", hash = "sha256:ab661c9e3718fe0452bbc2dace021b1fab812b76ed4d19f24aa25688b4ca2aa5", size = 20021, upload-time = "2026-04-24T20:21:45.842Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/29/a8db665ac1cd71e6d87f4404df1b6df7722eb0170b79cff2b1d8632d6844/pycuc-2.8.0.tar.gz", hash = "sha256:3d50cd75fb041eeae98f3ff742e8b7ac13c506186b8b576742318d9e11a65e2a", size = 20893, upload-time = "2026-05-01T01:02:36.221Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/56/ee07a19e7a8df0e87b13c8fde2a060c5f13195b232c56fa9e43879a8b27a/pycuc-2.7.1-py3-none-any.whl", hash = "sha256:29fb9eea7177f5e01f31d1c20dce521aba06fa9f3f02560489dc47cbd5dfa511", size = 27698, upload-time = "2026-04-24T20:21:44.869Z" },
+    { url = "https://files.pythonhosted.org/packages/63/67/c906edf56444a8ad0c7bb43ceac09f46efc64a6b0f8adbf1228feb6cd89e/pycuc-2.8.0-py3-none-any.whl", hash = "sha256:faab7f0a57e3bd5bcde15ec445d56e58329d05759e9206752fa76dae12ade470", size = 28996, upload-time = "2026-05-01T01:02:34.915Z" },
 ]
 
 [[package]]
@@ -304,7 +304,7 @@ wheels = [
 
 [[package]]
 name = "pymemsim"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
