@@ -304,7 +304,7 @@ wheels = [
 
 [[package]]
 name = "pymemsim"
-version = "0.2.1"
+version = "0.3.1"
 source = { editable = "." }
 dependencies = [
     { name = "numpy" },
@@ -381,7 +381,7 @@ wheels = [
 
 [[package]]
 name = "pythermodb"
-version = "1.13.5"
+version = "1.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
@@ -390,9 +390,9 @@ dependencies = [
     { name = "pythermodb-settings" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/22/dd/7edafaab4d65d17715c786e034717acea68a2212d468321771263fe8e408/pythermodb-1.13.5.tar.gz", hash = "sha256:10073713010ed33a89aec2cedb0ac23beb32e7b8b4dcac00cb88ebc8744ff8fe", size = 164064, upload-time = "2026-04-24T21:15:07.487Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/17/fa18748f777f0e4dfc3ed25391fbbdf1966746529416ac91911db27b218f/pythermodb-1.15.0.tar.gz", hash = "sha256:f3c9f7e0b28f1970474bfcfdb95b0b4d33e6b77756cf77c4d5d2ac2f868dd36d", size = 188308, upload-time = "2026-06-04T03:04:02.793Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/06/7156c56cbcf0a8b3539c087e6f273b3a09db81902ea0b7a79c898940fe09/pythermodb-1.13.5-py3-none-any.whl", hash = "sha256:da370da572d0e9ee61e59707de32af35c840bd614e9a1cff10055b5ca066a187", size = 192967, upload-time = "2026-04-24T21:15:05.824Z" },
+    { url = "https://files.pythonhosted.org/packages/49/7c/4620485deed1369bb753c9ecdb40efe22f20b8fa524587edb1b270854e90/pythermodb-1.15.0-py3-none-any.whl", hash = "sha256:31d7ef28d122b5ecaad8623560231b412764466ec92e5ed1c8ffd09969475786", size = 218471, upload-time = "2026-06-04T03:04:01.343Z" },
 ]
 
 [[package]]
