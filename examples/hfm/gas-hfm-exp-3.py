@@ -2,6 +2,7 @@
 import logging
 import sys
 import warnings
+from datetime import datetime
 from pathlib import Path
 from typing import cast, Literal
 from pythermodb_settings.models import CustomProp, Temperature
@@ -12,7 +13,7 @@ from examples.plot.plot_res import plot_hfm_result, plot_hfm_permeate_flow_profi
 from pymemsim.thermo import build_thermo_source
 from pymemsim.models import HeatTransferOptions, HollowFiberMembraneOptions, MembraneResult, HollowFiberMembraneModuleGeometry
 from pymemsim import HFM, create_hfm_module
-from pymemsim.utils import analyze_hfm_result, print_hfm_result_tables
+from pymemsim.utils import analyze_hfm_result, print_hfm_result_tables, save_hfm_analysis_txt
 from pymemsim.utils import Q_std_to_mol_s, to_m3_per_s
 
 
@@ -47,7 +48,7 @@ components = [CO2, CH4]
 
 # NOTE: heat-transfer options
 heat_transfer_options = HeatTransferOptions(
-    heat_transfer_mode="isothermal",
+    heat_transfer_mode="non-isothermal",
     heat_transfer_coefficient=CustomProp(value=100.0, unit="W/m2.K"),
     heat_transfer_area=CustomProp(value=2.0, unit="m2"),
     jacket_temperature=Temperature(value=330.0, unit="K"),
@@ -62,16 +63,16 @@ thermo_inputs = {}
 # ====================================================
 # ! method 1
 # volumetric flow rate
-feed_volumetric_flow = CustomProp(value=2.5e-4, unit="m3/min")
+# feed_volumetric_flow = CustomProp(value=2.5e-4, unit="m3/min")
 # convert to molar flow rate at standard conditions using ideal gas law
-feed_molar_flow = Q_std_to_mol_s(feed_volumetric_flow)
-print(f"feed molar flow: {feed_molar_flow.value:.4e} {feed_molar_flow.unit}")
+# feed_molar_flow = Q_std_to_mol_s(feed_volumetric_flow)
+# print(f"feed molar flow: {feed_molar_flow.value:.4e} {feed_molar_flow.unit}")
+# feed_inlet_flow = CustomProp(value=feed_molar_flow.value, unit="mol/s")
 
 # ! method 2 (alternative): directly specify feed molar flow rate
-# feed_molar_flow = CustomProp(value=0.01712, unit="mol/s")
+feed_inlet_flow = CustomProp(value=0.001585, unit="mol/s")
 
-# feed specification mode: total molar flow + feed mole fractions
-feed_inlet_flow = CustomProp(value=feed_molar_flow.value, unit="mol/s")
+# feed specification mode: feed mole fractions
 feed_mole_fractions = {
     "CO2-g": CustomProp(value=0.6, unit=""),
     "CH4-g": CustomProp(value=0.4, unit=""),
@@ -82,6 +83,18 @@ feed_mole_fractions = {
 #     "CO2-g": CustomProp(value=0.000001, unit="mol/s"),
 #     "CH4-g": CustomProp(value=0.000001, unit="mol/s"),
 # }
+
+# feed inlet temperature
+feed_inlet_temperature = Temperature(value=298.15, unit="K")
+
+# feed inlet pressure
+feed_pressure = CustomProp(value=405, unit="kPa")
+
+# permeate inlet temperature
+permeate_inlet_temperature = Temperature(value=298.15, unit="K")
+
+# permeate inlet pressure
+permeate_pressure = CustomProp(value=101, unit="kPa")
 
 # NOTE: gas transport coefficients Pi_i (Permeance) for each component i, in units of mol/s.m2.Pa
 # ! mol/s.m2.Pa
@@ -105,18 +118,17 @@ module_geometry = HollowFiberMembraneModuleGeometry(
     module_diameter=CustomProp(value=1, unit="cm"),
 )
 
-
 # NOTE: model inputs
 model_inputs = {
     # NOTE: dual-side inlet specs
     # ! feed
     "feed_inlet_flow": feed_inlet_flow,
     "feed_mole_fractions": feed_mole_fractions,
-    "feed_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "feed_pressure": CustomProp(value=405, unit="kPa"),
+    "feed_inlet_temperature": feed_inlet_temperature,
+    "feed_pressure": feed_pressure,
     # ! permeate
-    "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
-    "permeate_pressure": CustomProp(value=101, unit="kPa"),
+    "permeate_inlet_temperature": permeate_inlet_temperature,
+    "permeate_pressure": permeate_pressure,
     # NOTE: membrane module geometry inputs (used to calculate area-per-length internally)
     "module_geometry": module_geometry,
     # NOTE: heat transfer parameters
@@ -227,13 +239,19 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
     print("\n[bold magenta]Analysis of results:[/bold magenta]")
     print(analysis)
     print_hfm_result_tables(analysis)
+    run_id = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    flow_pattern_id = flow_pattern.replace(" ", "-")
+    analysis_file = EXAMPLES_DIR / "results" / \
+        f"gas-hfm-exp-3-{flow_pattern_id}-{run_id}.txt"
+    save_hfm_analysis_txt(analysis=analysis, file_path=analysis_file)
+    print(f"[bold green]Saved analysis to:[/bold green] {analysis_file}")
 
     return simulation_results
 
 
 # SETUP: run cases
 length_span = (0.0, 0.15)  # [m]
-flow_pattern_to_run = "counter-current"
+flow_pattern_to_run = "co-current"
 
 print("[bold green]Running gas HFM example for both flow patterns...[/bold green]")
 res_case = run_case(flow_pattern=flow_pattern_to_run, length_span=length_span)
@@ -242,7 +260,7 @@ if res_case is not None:
     plot_hfm_result(
         result=res_case,
         components=components,
-        show=True,
+        show=False,
         title_prefix=f"Gas HFM {flow_pattern_to_run}",
         basis="flow",
     )

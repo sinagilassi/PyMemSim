@@ -3,6 +3,8 @@ from .result_tools import (
     analyze_membrane_result,
     build_hfm_result_table_template,
     print_hfm_result_tables,
+    save_hfm_analysis_txt,
+    save_hfm_result_txt,
 )
 
 # NOTE: input tools
@@ -13,6 +15,8 @@ __all__ = [
     "analyze_membrane_result",
     "build_hfm_result_table_template",
     "print_hfm_result_tables",
+    "save_hfm_analysis_txt",
+    "save_hfm_result_txt",
     # input tools
     "Q_std_to_mol_s",
     "to_m3_per_s",
