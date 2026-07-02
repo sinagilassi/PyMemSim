@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence
+import json
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 from pythermodb_settings.models import Temperature
@@ -634,6 +636,51 @@ def analyze_membrane_result(
         target_component=target_component,
         eps=eps,
     )
+
+
+def save_hfm_analysis_txt(
+    analysis: Dict[str, Any],
+    file_path: Union[str, Path],
+    indent: int = 2,
+) -> Path:
+    """Save an HFM analysis dictionary to a human-readable text file.
+
+    The saved content preserves the same nested result structure returned by
+    ``analyze_hfm_result`` using formatted JSON text.
+    """
+    output_path = Path(file_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(analysis, indent=indent, default=str),
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def save_hfm_result_txt(
+    result: MembraneResult,
+    hfm_module: Any,
+    file_path: Union[str, Path],
+    target_component: Optional[str] = None,
+    eps: float = 1e-30,
+    indent: int = 2,
+) -> Dict[str, Any]:
+    """Analyze an HFM result and save the analysis to a text file.
+
+    Returns the same analysis dictionary produced by ``analyze_hfm_result``.
+    """
+    analysis = analyze_hfm_result(
+        result=result,
+        hfm_module=hfm_module,
+        target_component=target_component,
+        eps=eps,
+    )
+    save_hfm_analysis_txt(
+        analysis=analysis,
+        file_path=file_path,
+        indent=indent,
+    )
+    return analysis
 
 
 def build_hfm_result_table_template(analysis: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
