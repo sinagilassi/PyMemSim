@@ -80,6 +80,12 @@ class ThermoModelInputs:
         # ! phase
         self.phase = unit_options.phase
 
+        # SECTION: fluid dynamic options
+        # ! feed pressure mode
+        self.feed_pressure_mode = unit_options.feed_pressure_mode
+        # ! permeate pressure mode
+        self.permeate_pressure_mode = unit_options.permeate_pressure_mode
+
         # SECTION: heat transfer options
         # ! heat transfer mode
         self.heat_transfer_mode = heat_transfer_options.heat_transfer_mode
