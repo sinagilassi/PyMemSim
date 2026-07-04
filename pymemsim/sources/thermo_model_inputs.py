@@ -11,6 +11,7 @@ from ..utils.tools import config_components_property
 from ..models.heat import HeatTransferOptions
 from ..models import GasModel
 from ..utils.unit_tools import to_J_per_mol_K, to_g_per_m3, to_J_per_mol
+import pycuc
 
 
 class ThermoModelInputs:
@@ -21,6 +22,10 @@ class ThermoModelInputs:
     liquid_heat_capacity_constant_comp: Dict[str, float] = {}
     liquid_density_constant_values: np.ndarray = np.array([])
     liquid_density_constant_comp: Dict[str, float] = {}
+    gas_viscosity_constant_values: List[CustomProp] = []
+    gas_viscosity_constant_comp: Dict[str, CustomProp] = {}
+    liquid_viscosity_constant_values: List[CustomProp] = []
+    liquid_viscosity_constant_comp: Dict[str, CustomProp] = {}
     # ! ideal gas formation enthalpy at 298 K
     EnFo_IG_298_src: Dict[str, Dict[str, Any]] = {}
     EnFo_IG_298: np.ndarray = np.array([])
@@ -91,6 +96,15 @@ class ThermoModelInputs:
         self.heat_transfer_mode = heat_transfer_options.heat_transfer_mode
 
         # SECTION: Extract property sources and configure properties
+        if self.phase == "gas" and "gas_viscosity" in self.thermo_inputs_keys:
+            (
+                self.gas_viscosity_constant_values,
+                self.gas_viscosity_constant_comp
+            ) = self._config_constant_viscosity(
+                key="gas_viscosity",
+                symbol="Vis_GAS",
+            )
+
         # ! Ideal Gas Heat Capacity at reference temperature (e.g., 298 K)
         if self.heat_transfer_mode == "non-isothermal":
             # check heat capacity mode
@@ -141,6 +155,15 @@ class ThermoModelInputs:
                     self.liquid_density_constant_values,
                     self.liquid_density_constant_comp
                 ) = self._config_constant_liquid_density()
+
+            if "liquid_viscosity" in self.thermo_inputs_keys:
+                (
+                    self.liquid_viscosity_constant_values,
+                    self.liquid_viscosity_constant_comp
+                ) = self._config_constant_viscosity(
+                    key="liquid_viscosity",
+                    symbol="Vis_LIQ",
+                )
 
     # SECTION: configuration methods for properties
     # ! gas phase heat capacity configuration
@@ -328,3 +351,48 @@ class ThermoModelInputs:
             raise ValueError(
                 "Ideal gas formation enthalpy must be provided in model_inputs for constant ideal gas formation enthalpy mode."
             )
+
+    def _config_constant_viscosity(
+        self,
+        key: str,
+        symbol: str,
+    ) -> Tuple[List[CustomProp], Dict[str, CustomProp]]:
+        viscosity_: dict[str, CustomProp] = self.thermo_inputs[key]
+        viscosity_values: List[CustomProp] = []
+        viscosity_comp: Dict[str, CustomProp] = {}
+
+        for comp_id in self.component_formula_state:
+            if comp_id not in viscosity_:
+                raise ValueError(
+                    f"Viscosity value for component '{comp_id}' not found in thermo_inputs['{key}']."
+                )
+
+            item = viscosity_[comp_id]
+            if hasattr(item, "value") and hasattr(item, "unit"):
+                value = float(item.value)
+                unit = str(item.unit)
+            elif isinstance(item, dict):
+                if "value" not in item or "unit" not in item:
+                    raise ValueError(
+                        f"Viscosity for component '{comp_id}' in thermo_inputs['{key}'] must contain value and unit."
+                    )
+                value = float(item["value"])
+                unit = str(item["unit"])
+            else:
+                raise ValueError(
+                    f"Viscosity for component '{comp_id}' in thermo_inputs['{key}'] must provide value and unit."
+                )
+
+            value_pa_s = pycuc.convert_from_to(
+                value=value,
+                from_unit=unit,
+                to_unit="Pa.s",
+            )
+            prop = CustomProp(
+                value=float(value_pa_s),
+                unit="Pa.s",
+            )
+            viscosity_values.append(prop)
+            viscosity_comp[comp_id] = prop
+
+        return viscosity_values, viscosity_comp
