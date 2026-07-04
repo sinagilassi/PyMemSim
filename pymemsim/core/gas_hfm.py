@@ -21,6 +21,21 @@ from ..transport.hydrodynamics import (
 logger = logging.getLogger(__name__)
 
 
+def _clip_finite(value: float, lower: float, upper: float) -> float:
+    value = float(value)
+    if not np.isfinite(value):
+        return float(upper if value > 0.0 else lower)
+    return float(np.clip(value, lower, upper))
+
+
+def _require_geometry_value(name: str, value: float | None) -> float:
+    if value is None:
+        raise ValueError(
+            f"Pressure-drop geometry is incomplete. Missing: {name}"
+        )
+    return float(value)
+
+
 class GasHFM:
     """
     Gas-phase hollow-fiber membrane model (cocurrent, dual-side, constant pressure).
@@ -71,6 +86,11 @@ class GasHFM:
         # ! permeate pressure [Pa]
         self.Pp = float(hfm_core.permeate_pressure)
         self.pressure_floor = 1.0
+        self.temperature_floor = 100.0
+        self.max_solver_velocity = 1.0e6
+        self.max_solver_density = 1.0e6
+        self.max_solver_pressure_derivative = 1.0e12
+        self.max_solver_pressure_squared_derivative = 1.0e18
 
         # ! membrane area per length [m]
         self.a_m = float(hfm_core.membrane_area_per_length)
@@ -312,8 +332,9 @@ class GasHFM:
             idx += 1
 
         if self.heat_transfer_mode == "non-isothermal":
-            Tf = float(y[idx])
-            Tp = float(y[idx + 1])
+            temperature_floor = float(getattr(self, "temperature_floor", 100.0))
+            Tf = float(smooth_floor(y[idx], xmin=temperature_floor, s=1e-3))
+            Tp = float(smooth_floor(y[idx + 1], xmin=temperature_floor, s=1e-3))
         else:
             Tf = self.Tf_in
             Tp = self.Tp_in
@@ -477,6 +498,14 @@ class GasHFM:
     ) -> float:
         mu_mix = self.thermo_source.calc_Vis_GAS(mole_fractions=yf)
         mu = float(mu_mix.value)
+        shell_flow_area = _require_geometry_value(
+            "shell_flow_area",
+            self.shell_flow_area,
+        )
+        shell_hydraulic_diameter = _require_geometry_value(
+            "shell_hydraulic_diameter",
+            self.shell_hydraulic_diameter,
+        )
         q_shell = self.thermo_source.calc_gas_volumetric_flow_rate(
             molar_flow_rate=Ff_total,
             temperature=Tf,
@@ -485,16 +514,26 @@ class GasHFM:
             gas_model=cast(GasModel, self.gas_model),
         )
         q_shell = max(float(q_shell), 1e-30)
-        u_shell = q_shell / float(self.shell_flow_area)
+        u_shell = _clip_finite(
+            q_shell / shell_flow_area,
+            lower=0.0,
+            upper=float(getattr(self, "max_solver_velocity", 1.0e6)),
+        )
         mw_mix_kg_per_mol = float(np.sum(yf * self.thermo_source.MW)) / 1000.0
-        rho_shell = Pf * mw_mix_kg_per_mol / (self.R * Tf)
-        return shell_pressure_derivative_laminar(
+        rho_shell = _clip_finite(
+            Pf * mw_mix_kg_per_mol / (self.R * Tf),
+            lower=1.0e-30,
+            upper=float(getattr(self, "max_solver_density", 1.0e6)),
+        )
+        dP_dz = shell_pressure_derivative_laminar(
             density=rho_shell,
             velocity=u_shell,
-            hydraulic_diameter=float(self.shell_hydraulic_diameter),
+            hydraulic_diameter=shell_hydraulic_diameter,
             mu=mu,
             axial_sign=1.0,
         )
+        limit = float(getattr(self, "max_solver_pressure_derivative", 1.0e12))
+        return _clip_finite(dP_dz, lower=-limit, upper=limit)
 
     def _calc_permeate_fiber_pressure_squared_derivative(
         self,
@@ -503,15 +542,19 @@ class GasHFM:
         Tp: float,
     ) -> float:
         mu_mix = self.thermo_source.calc_Vis_GAS(mole_fractions=yp)
-        return gas_fiber_pressure_squared_derivative(
+        n_fibers = _require_geometry_value("number_of_fibers", self.n_fibers)
+        d_inner = _require_geometry_value("fiber_inner_diameter", self.d_inner)
+        dP2_dz = gas_fiber_pressure_squared_derivative(
             mu=float(mu_mix.value),
             molar_flow_rate=Fp_total,
-            n_fibers=float(self.n_fibers),
-            diameter_inner=float(self.d_inner),
+            n_fibers=n_fibers,
+            diameter_inner=d_inner,
             temperature=Tp,
             gas_constant=self.R,
             axial_sign=float(self.s_p),
         )
+        limit = float(getattr(self, "max_solver_pressure_squared_derivative", 1.0e18))
+        return _clip_finite(dP2_dz, lower=-limit, upper=limit)
 
     def _calc_fluxes_v0(self, Ff: np.ndarray, Fp: np.ndarray) -> np.ndarray:
         Ff_safe = np.asarray(Ff, dtype=float)
