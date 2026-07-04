@@ -70,12 +70,6 @@ feed_mole_fractions = {
     "CH4-g": CustomProp(value=0.4, unit=""),
 }
 
-# permeate inlet flow (can be set to zero or a small value to avoid numerical issues with zero flow)
-# permeate_inlet_flows = {
-#     "CO2-g": CustomProp(value=0.000001, unit="mol/s"),
-#     "CH4-g": CustomProp(value=0.000001, unit="mol/s"),
-# }
-
 # feed inlet temperature
 feed_inlet_temperature = Temperature(value=298.15, unit="K")
 
