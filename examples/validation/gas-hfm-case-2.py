@@ -37,10 +37,6 @@ for path in (PROJECT_DIR, EXAMPLES_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-# ! locals
-# ! inputs
-
-
 # NOTE: silence library warnings/errors for this example run
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
@@ -170,8 +166,8 @@ def run_case(
     print_hfm_result_tables(analysis)
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     flow_pattern_id = flow_pattern.replace(" ", "-")
-    analysis_file = EXAMPLES_DIR / "results" / \
-        f"gas-hfm-exp-4-{flow_pattern_id}-{run_id}.txt"
+    analysis_file = EXAMPLES_DIR / "validation" / \
+        f"gas-hfm-case-{flow_pattern_id}-{run_id}.txt"
     save_hfm_analysis_txt(analysis=analysis, file_path=analysis_file)
     print(f"[bold green]Saved analysis to:[/bold green] {analysis_file}")
 
