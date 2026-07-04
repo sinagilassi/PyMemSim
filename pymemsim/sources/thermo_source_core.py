@@ -11,6 +11,7 @@ from pythermocalcdb.reactions.reactions import dH_rxn_STD
 from pythermocalcdb.docs.thermo import calc_En_IG_ref, calc_En, calc_En_IG_ref_hsg, calc_En_hsg
 from pythermocalcdb.reactions.source import dH_rxn_STD as dH_rxn_reactions
 from pythermocalcdb.models import ComponentEnthalpy
+from pythermocalcdb.thermo.viscosity import calc_gas_mixture_viscosity, calc_liquid_mixture_viscosity
 from pyreactsim_core.models.rate_exp import ReactionRateExpression
 # locals
 from .thermo_model_inputs import ThermoModelInputs
@@ -1115,3 +1116,15 @@ class ThermoSourceCore(ThermoCalc):
         res = np.array(res, dtype=float)
 
         return res_comp, res
+
+    # SECTION: Calculate Viscosity
+    def calc_Vis_IG(
+            self
+    ):
+        pass
+
+    # ! calculate liquid viscosity
+    def calc_Vis_LIQ(
+            self
+    ):
+        pass
