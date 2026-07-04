@@ -176,3 +176,6 @@ agents/
 
 # notes
 notes/
+
+# txt
+*.txt
