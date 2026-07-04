@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import numpy as np
+from pythermodb_settings.models import CustomProp
 
 from pymemsim.core.gas_hfm import GasHFM
 from pymemsim.core.gas_hfmx import GasHFMX
@@ -87,8 +88,18 @@ class _DummyLiquid(LiquidHFM):
 
 
 class _ThermoStub:
+    MW = np.array([16.0, 44.0], dtype=float)
+
     def calc_Cp_IG(self, temperature):
         return np.array([1.0, 1.0], dtype=float)
+
+    def calc_gas_volumetric_flow_rate(self, molar_flow_rate, temperature, pressure, R, gas_model):
+        _ = gas_model
+        return float(molar_flow_rate * R * temperature / pressure)
+
+    def calc_Vis_GAS(self, mole_fractions):
+        _ = mole_fractions
+        return CustomProp(value=1.8e-5, unit="Pa.s")
 
 
 def test_flow_pattern_aliases_normalize_to_canonical():
@@ -296,6 +307,124 @@ def test_countercurrent_permeate_energy_sign_changes_conduction_only():
     expected_dTp = module.a_m * (module.s_p * q_cond + module.q_ext_p) / cp_flow_p
     assert abs(dTp_dz - expected_dTp) < 1e-12
     assert np.isfinite(dTf_dz)
+
+
+def _build_pressure_state_module() -> GasHFM:
+    module = GasHFM.__new__(GasHFM)
+    module.component_num = 2
+    module.ns = 2
+    module.heat_transfer_mode = "isothermal"
+    module.feed_pressure_mode = "state_variable"
+    module.permeate_pressure_mode = "state_variable"
+    module.has_feed_pressure_state = True
+    module.has_permeate_pressure_state = True
+    module.Ff_in = np.array([0.7, 0.3], dtype=float)
+    module.Fp_in = np.array([1.0e-12, 1.0e-12], dtype=float)
+    module.Tf_in = 300.0
+    module.Tp_in = 300.0
+    module.Pf = 400000.0
+    module.Pp = 100000.0
+    module.pressure_floor = 1.0
+    module.a_m = 0.1
+    module.Pi = np.array([1.0e-9, 2.0e-9], dtype=float)
+    module.s_p = 1
+    module.R = 8.314462618
+    module.gas_model = "ideal"
+    module.thermo_source = _ThermoStub()
+    module.reaction_rates = []
+    module.component_formula_state = ["A-g", "B-g"]
+    module.n_fibers = 100.0
+    module.d_inner = 1.0e-3
+    module.shell_flow_area = 1.0e-3
+    module.shell_hydraulic_diameter = 1.0e-2
+    return module
+
+
+def test_gas_hfm_pressure_states_extend_y0_and_rhs():
+    module = _build_pressure_state_module()
+
+    y0 = module.build_y0()
+    assert y0.shape == (6,)
+    assert y0[4] == module.Pf
+    assert y0[5] == module.Pp**2
+
+    dy = module.rhs(0.0, y0)
+    assert dy.shape == y0.shape
+    assert dy[4] < 0.0
+    assert dy[5] < 0.0
+
+
+def test_gas_hfm_flux_uses_local_pressures():
+    module = _build_pressure_state_module()
+    Ff = np.array([0.5, 0.5], dtype=float)
+    Fp = np.array([0.2, 0.8], dtype=float)
+
+    J = module._calc_fluxes(Ff=Ff, Fp=Fp, Pf=300000.0, Pp=50000.0)
+    expected = module.Pi * (
+        np.array([0.5, 0.5]) * 300000.0
+        - np.array([0.2, 0.8]) * 50000.0
+    )
+
+    assert np.allclose(J, expected)
+
+
+def test_physical_result_converts_permeate_pressure_squared_to_pressure():
+    module = _build_pressure_state_module()
+    hfm = HFM.__new__(HFM)
+    hfm.module = module
+
+    state = np.array(
+        [
+            [0.7, 0.6],
+            [0.3, 0.25],
+            [1.0e-12, 0.1],
+            [1.0e-12, 0.05],
+            [400000.0, 390000.0],
+            [100000.0**2, 90000.0**2],
+        ],
+        dtype=float,
+    )
+
+    public = hfm._state_to_physical(state)
+
+    assert public.shape == state.shape
+    assert np.allclose(public[4], state[4])
+    assert np.allclose(public[5], np.array([100000.0, 90000.0]))
+
+
+def test_scaled_result_converts_pressure_states_to_physical_pressure():
+    module = GasHFMX.__new__(GasHFMX)
+    module.component_num = 1
+    module.ns = 1
+    module.has_feed_pressure_state = True
+    module.has_permeate_pressure_state = True
+    module.heat_transfer_mode = "isothermal"
+    module.Ff_scale = np.array([2.0], dtype=float)
+    module.Fp_scale = np.array([0.5], dtype=float)
+    module.Pf = 400000.0
+    module.Pp = 100000.0
+    module.Pf_scale = 400000.0
+    module.Pp2_scale = 100000.0**2
+
+    hfm = HFM.__new__(HFM)
+    hfm.module = module
+    state_scaled = np.array(
+        [
+            [1.0],
+            [0.2],
+            [0.95],
+            [0.81],
+        ],
+        dtype=float,
+    )
+
+    public = hfm._state_to_physical(state_scaled)
+
+    assert public.shape == state_scaled.shape
+    assert np.isclose(public[0, 0], 2.0)
+    assert np.isclose(public[1, 0], 0.1)
+    assert np.isclose(public[2, 0], 380000.0)
+    assert np.isclose(public[3, 0], 90000.0)
 
 
 class _expect_raises:
