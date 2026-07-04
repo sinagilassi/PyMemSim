@@ -35,8 +35,9 @@ def plot_hfm_result(
 
     Supported state layouts
     -----------------------
-    - Isothermal dual-side: [Ff_i..., Fp_i...]            => (2*ns, n_points)
-    - Non-isothermal dual-side: [Ff_i..., Fp_i..., Tf,Tp] => (2*ns+2, n_points)
+    - Isothermal dual-side: [Ff_i..., Fp_i...]                     => (2*ns, n_points)
+    - Non-isothermal dual-side: [Ff_i..., Fp_i..., Tf,Tp]          => (2*ns+2, n_points)
+    - Pressure-drop gas layout: [Ff_i..., Fp_i..., Pf?,Pp?,Tf?,Tp?]
     """
     if basis not in ("flow", "mole_fraction"):
         raise ValueError("basis must be 'flow' or 'mole_fraction'.")
@@ -55,18 +56,37 @@ def plot_hfm_result(
     labels = _component_labels(components)
     n_states = state.shape[0]
 
-    dual_side_isothermal = n_states == 2 * ns
-    dual_side_non_isothermal = n_states == 2 * ns + 2
-    if not dual_side_isothermal and not dual_side_non_isothermal:
+    n_extra = n_states - 2 * ns
+    if n_extra < 0 or n_extra not in (0, 1, 2, 3, 4):
         raise ValueError(
             f"Unsupported MembraneResult state shape {state.shape}. "
-            f"Expected (2*ns,n) or (2*ns+2,n) with ns={ns}."
+            f"Expected flow rows plus optional pressure and temperature rows with ns={ns}."
         )
 
     Ff = state[:ns, :]
     Fp = state[ns:2 * ns, :]
-    Tf = state[2 * ns, :] if dual_side_non_isothermal else None
-    Tp = state[2 * ns + 1, :] if dual_side_non_isothermal else None
+    idx = 2 * ns
+    Pf = None
+    Pp = None
+    Tf = None
+    Tp = None
+    has_pressure_profiles = n_extra in (1, 3, 4)
+    has_temperature_profiles = n_extra in (2, 3, 4)
+
+    if n_extra == 1:
+        Pf = state[idx, :]
+    elif n_extra == 2:
+        Tf = state[idx, :]
+        Tp = state[idx + 1, :]
+    elif n_extra == 3:
+        Pf = state[idx, :]
+        Tf = state[idx + 1, :]
+        Tp = state[idx + 2, :]
+    elif n_extra == 4:
+        Pf = state[idx, :]
+        Pp = state[idx + 1, :]
+        Tf = state[idx + 2, :]
+        Tp = state[idx + 3, :]
 
     if basis == "mole_fraction":
         def _safe_comp(flows: np.ndarray) -> np.ndarray:
@@ -91,7 +111,7 @@ def plot_hfm_result(
         feed_title = f"{title_prefix}: Feed-Side Flows"
         perm_title = f"{title_prefix}: Permeate-Side Flows"
 
-    nrows = 2 if dual_side_isothermal else 3
+    nrows = 2 + int(has_pressure_profiles) + int(has_temperature_profiles)
     fig, axes = plt.subplots(nrows, 1, figsize=(10, 3.5 * nrows), sharex=True)
     axes = np.atleast_1d(axes)
 
@@ -109,13 +129,26 @@ def plot_hfm_result(
     axes[1].grid(True, alpha=0.3)
     axes[1].legend(loc="best", fontsize=8)
 
-    if dual_side_non_isothermal and Tf is not None and Tp is not None:
-        axes[2].plot(span, Tf, label="T_feed")
-        axes[2].plot(span, Tp, label="T_permeate")
-        axes[2].set_ylabel("Temperature [K]")
-        axes[2].set_title(f"{title_prefix}: Temperature Profiles")
-        axes[2].grid(True, alpha=0.3)
-        axes[2].legend(loc="best", fontsize=8)
+    ax_idx = 2
+
+    if has_pressure_profiles:
+        if Pf is not None:
+            axes[ax_idx].plot(span, Pf, label="P_feed")
+        if Pp is not None:
+            axes[ax_idx].plot(span, Pp, label="P_permeate")
+        axes[ax_idx].set_ylabel("Pressure [Pa]")
+        axes[ax_idx].set_title(f"{title_prefix}: Pressure Profiles")
+        axes[ax_idx].grid(True, alpha=0.3)
+        axes[ax_idx].legend(loc="best", fontsize=8)
+        ax_idx += 1
+
+    if has_temperature_profiles and Tf is not None and Tp is not None:
+        axes[ax_idx].plot(span, Tf, label="T_feed")
+        axes[ax_idx].plot(span, Tp, label="T_permeate")
+        axes[ax_idx].set_ylabel("Temperature [K]")
+        axes[ax_idx].set_title(f"{title_prefix}: Temperature Profiles")
+        axes[ax_idx].grid(True, alpha=0.3)
+        axes[ax_idx].legend(loc="best", fontsize=8)
 
     axes[-1].set_xlabel("Axial Coordinate z")
     fig.tight_layout()
