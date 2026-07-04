@@ -167,7 +167,7 @@ def run_case(
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     flow_pattern_id = flow_pattern.replace(" ", "-")
     analysis_file = EXAMPLES_DIR / "validation" / \
-        f"gas-hfm-case-{flow_pattern_id}-{run_id}.txt"
+        f"hfm-case-{flow_pattern_id}-{run_id}.txt"
     save_hfm_analysis_txt(analysis=analysis, file_path=analysis_file)
     print(f"[bold green]Saved analysis to:[/bold green] {analysis_file}")
 
