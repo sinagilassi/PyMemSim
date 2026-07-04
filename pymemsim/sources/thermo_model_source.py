@@ -2,7 +2,7 @@
 import logging
 import numpy as np
 from typing import List, Dict, Any, cast, Optional, Tuple
-from pythermodb_settings.models import Component, Temperature, Pressure, CustomProperty, ComponentKey
+from pythermodb_settings.models import Component, Temperature, Pressure, CustomProperty, CustomProp, ComponentKey
 from pyThermoLinkDB.thermo import Source
 from pyThermoLinkDB.models import ModelSource
 from pyThermoLinkDB.models.component_models import ComponentEquationSource
@@ -41,10 +41,10 @@ class ThermoModelSource:
     EnFo_IG_298_comp: Dict[str, float] = {}
     MW: np.ndarray = np.array([])
     MW_comp: Dict[str, float] = {}
-    Vis_GAS: List[CustomProperty] = []
-    Vis_GAS_comp: Dict[str, CustomProperty] = {}
-    Vis_LIQ: List[CustomProperty] = []
-    Vis_LIQ_comp: Dict[str, CustomProperty] = {}
+    Vis_GAS: List[CustomProp] = []
+    Vis_GAS_comp: Dict[str, CustomProp] = {}
+    Vis_LIQ: List[CustomProp] = []
+    Vis_LIQ_comp: Dict[str, CustomProp] = {}
 
     def __init__(
         self,
@@ -258,9 +258,9 @@ class ThermoModelSource:
         prop_source: Dict[str, Dict[str, Any]],
         output_unit: str,
         symbol: str,
-    ) -> Tuple[List[CustomProperty], Dict[str, CustomProperty]]:
-        values: List[CustomProperty] = []
-        comp_values: Dict[str, CustomProperty] = {}
+    ) -> Tuple[List[CustomProp], Dict[str, CustomProp]]:
+        values: List[CustomProp] = []
+        comp_values: Dict[str, CustomProp] = {}
 
         for comp in self.component_ids:
             dt_src = prop_source.get(comp)
@@ -277,10 +277,9 @@ class ThermoModelSource:
                 from_unit=str(unit),
                 to_unit=output_unit,
             )
-            prop = CustomProperty(
+            prop = CustomProp(
                 value=float(value_out),
                 unit=output_unit,
-                symbol=symbol,
             )
             values.append(prop)
             comp_values[comp] = prop
