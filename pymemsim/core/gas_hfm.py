@@ -12,6 +12,10 @@ from ..utils.reaction_tools import stoichiometry_mat, stoichiometry_mat_key
 from ..utils.thermo_tools import calc_rxn_heat_generation, calc_total_heat_capacity
 from .hfmc import HFMCore
 from ..utils.tools import smooth_floor
+from ..transport.hydrodynamics import (
+    gas_fiber_pressure_squared_derivative,
+    shell_pressure_derivative_laminar,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +44,10 @@ class GasHFM:
 
         self.heat_transfer_mode = hfm_core.heat_transfer_mode
         self.gas_model = hfm_core.gas_model
+        self.feed_pressure_mode = hfm_core.feed_pressure_mode
+        self.permeate_pressure_mode = hfm_core.permeate_pressure_mode
+        self.has_feed_pressure_state = self.feed_pressure_mode == "state_variable"
+        self.has_permeate_pressure_state = self.permeate_pressure_mode == "state_variable"
 
         # NOTE: flow pattern setup
         self.s_p = hfm_core.permeate_axial_sign
@@ -62,9 +70,17 @@ class GasHFM:
         self.Pf = float(hfm_core.feed_pressure)
         # ! permeate pressure [Pa]
         self.Pp = float(hfm_core.permeate_pressure)
+        self.pressure_floor = 1.0
 
         # ! membrane area per length [m]
         self.a_m = float(hfm_core.membrane_area_per_length)
+
+        # ! pressure-drop geometry
+        self.n_fibers = hfm_core.number_of_fibers
+        self.d_inner = hfm_core.fiber_inner_diameter
+        self.d_outer = hfm_core.fiber_outer_diameter
+        self.shell_flow_area = hfm_core.shell_free_area
+        self.shell_hydraulic_diameter = hfm_core.shell_hydraulic_diameter
 
         # ! overall heat transfer coefficient [W/m2.K]
         self.U_m = float(hfm_core.overall_heat_transfer_coefficient)
@@ -108,6 +124,20 @@ class GasHFM:
             raise ValueError(
                 "gas_transport_coefficients length must match component_num.")
 
+        if self.has_feed_pressure_state or self.has_permeate_pressure_state:
+            required_geometry = {
+                "number_of_fibers": self.n_fibers,
+                "fiber_inner_diameter": self.d_inner,
+                "shell_flow_area": self.shell_flow_area,
+                "shell_hydraulic_diameter": self.shell_hydraulic_diameter,
+            }
+            missing = [k for k, v in required_geometry.items() if v is None]
+            if len(missing) > 0:
+                raise ValueError(
+                    "Pressure-drop geometry is incomplete. Missing: "
+                    f"{missing}"
+                )
+
     # SECTION: Handlers
     # ! inlet flow
     @property
@@ -119,10 +149,14 @@ class GasHFM:
     def build_y0(self) -> np.ndarray:
         """
         State layout:
-        y = [Ff_i..., Fp_i..., Tf?, Tp?]
+        y = [Ff_i..., Fp_i..., Pf?, Pp2?, Tf?, Tp?]
         """
         y0_parts: List[np.ndarray] = [
             self.Ff_in.astype(float), self.Fp_in.astype(float)]
+        if getattr(self, "has_feed_pressure_state", False):
+            y0_parts.append(np.array([self.Pf], dtype=float))
+        if getattr(self, "has_permeate_pressure_state", False):
+            y0_parts.append(np.array([self.Pp**2], dtype=float))
         if self.heat_transfer_mode == "non-isothermal":
             y0_parts.append(np.array([self.Tf_in, self.Tp_in], dtype=float))
         return np.concatenate(y0_parts)
@@ -141,17 +175,29 @@ class GasHFM:
         # Permeate at z=L
         bc_permeate = yb[ns:2*ns] - self.Fp_in
 
+        bc_parts = [bc_feed, bc_permeate]
+        idx = 2 * ns
+
+        if getattr(self, "has_feed_pressure_state", False):
+            bc_parts.append(np.array([ya[idx] - self.Pf], dtype=float))
+            idx += 1
+
+        if getattr(self, "has_permeate_pressure_state", False):
+            p_state = yb[idx] if self.s_p < 0 else ya[idx]
+            bc_parts.append(np.array([p_state - self.Pp**2], dtype=float))
+            idx += 1
+
         # NOTE: Add temperature BCs if non-isothermal
         if self.heat_transfer_mode == "non-isothermal":
             # Tf at z=0
-            bc_Tf = ya[2*ns] - self.Tf_in
+            bc_Tf = ya[idx] - self.Tf_in
 
             # Tp at z=L
-            bc_Tp = yb[2*ns + 1] - self.Tp_in
+            bc_Tp = yb[idx + 1] - self.Tp_in
 
-            return np.concatenate([bc_feed, bc_permeate, np.array([bc_Tf, bc_Tp], dtype=float)])
+            bc_parts.append(np.array([bc_Tf, bc_Tp], dtype=float))
 
-        return np.concatenate([bc_feed, bc_permeate])
+        return np.concatenate(bc_parts)
 
     # ! build mesh
     def build_mesh(
@@ -214,6 +260,12 @@ class GasHFM:
         ])
 
         y_parts = [ff_guess, fp_guess]
+        if getattr(self, "has_feed_pressure_state", False):
+            pf_guess = np.full(n_points, self.Pf, dtype=float)
+            y_parts.append(np.vstack([pf_guess]))
+        if getattr(self, "has_permeate_pressure_state", False):
+            pp2_guess = np.full(n_points, self.Pp**2, dtype=float)
+            y_parts.append(np.vstack([pp2_guess]))
         if self.heat_transfer_mode == "non-isothermal":
             tf_out_guess = 0.99 * self.Tf_in + 0.01 * self.Tp_in
             tp_start_guess = 0.99 * self.Tp_in + 0.01 * self.Tf_in
@@ -245,9 +297,23 @@ class GasHFM:
             dtype=float
         )
 
+        idx = 2 * ns
+        Pf_local = self.Pf
+        Pp_local = self.Pp
+        Pp2_local = self.Pp**2
+
+        if getattr(self, "has_feed_pressure_state", False):
+            Pf_local = max(float(y[idx]), self.pressure_floor)
+            idx += 1
+
+        if getattr(self, "has_permeate_pressure_state", False):
+            Pp2_local = max(float(y[idx]), self.pressure_floor**2)
+            Pp_local = float(np.sqrt(Pp2_local))
+            idx += 1
+
         if self.heat_transfer_mode == "non-isothermal":
-            Tf = float(y[2 * ns])
-            Tp = float(y[2 * ns + 1])
+            Tf = float(y[idx])
+            Tp = float(y[idx + 1])
         else:
             Tf = self.Tf_in
             Tp = self.Tp_in
@@ -255,7 +321,7 @@ class GasHFM:
         # NOTE: Build feed-side reaction closure once per integration step.
         # ! feed-side
         temperature_f = Temperature(value=Tf, unit="K")
-        pressure_f = Pressure(value=self.Pf, unit="Pa")
+        pressure_f = Pressure(value=Pf_local, unit="Pa")
 
         # NOTE: Calculate feed-side molar flow rate, composition, and concentration for reaction calculations
         # ! feed-side molar flow rate [mol/s]
@@ -268,7 +334,7 @@ class GasHFM:
         qf = self.thermo_source.calc_gas_volumetric_flow_rate(
             molar_flow_rate=Ff_total,
             temperature=Tf,
-            pressure=self.Pf,
+            pressure=Pf_local,
             R=self.R,
             gas_model=cast(GasModel, self.gas_model)
         )
@@ -279,7 +345,7 @@ class GasHFM:
 
         # NOTE: Build feed-side partial pressure and concentration dicts for reaction rate calculations
         partial_pressures_std = {
-            sp: CustomProperty(value=yf[i] * self.Pf, unit="Pa", symbol="P")
+            sp: CustomProperty(value=yf[i] * Pf_local, unit="Pa", symbol="P")
             for i, sp in enumerate(self.component_formula_state)
         }
         concentration_std = {
@@ -302,7 +368,7 @@ class GasHFM:
 
         # NOTE: Fluxes J_i = Pi_i * (y_f_i P_f - y_p_i P_p)
         # ! [mol/m2.s]
-        J = self._calc_fluxes(Ff=Ff, Fp=Fp)
+        J = self._calc_fluxes(Ff=Ff, Fp=Fp, Pf=Pf_local, Pp=Pp_local)
 
         # NOTE: Material balances
         # ! feed side: dFf_i/dz = -a_m * J_i + r_i (reaction source)
@@ -314,7 +380,31 @@ class GasHFM:
         dFp_dz = self.s_p * self.a_m * J
 
         # >> Combine derivatives
-        out = np.concatenate([dFf_dz, dFp_dz])
+        out_parts = [dFf_dz, dFp_dz]
+
+        if getattr(self, "has_feed_pressure_state", False):
+            out_parts.append(np.array([
+                self._calc_feed_shell_pressure_derivative(
+                    Ff=Ff,
+                    yf=yf,
+                    Ff_total=Ff_total,
+                    Tf=Tf,
+                    Pf=Pf_local,
+                )
+            ], dtype=float))
+
+        if getattr(self, "has_permeate_pressure_state", False):
+            Fp_total_for_pressure = max(float(np.sum(Fp)), 1e-30)
+            yp_for_pressure = Fp / Fp_total_for_pressure
+            out_parts.append(np.array([
+                self._calc_permeate_fiber_pressure_squared_derivative(
+                    Fp_total=Fp_total_for_pressure,
+                    yp=yp_for_pressure,
+                    Tp=Tp,
+                )
+            ], dtype=float))
+
+        out = np.concatenate(out_parts)
 
         if self.heat_transfer_mode == "isothermal":
             return out
@@ -336,7 +426,13 @@ class GasHFM:
         return np.concatenate([out, np.array([dTf_dz, dTp_dz], dtype=float)])
 
     # NOTE: calculate fluxes based on current feed/permeate flows and pressures
-    def _calc_fluxes(self, Ff: np.ndarray, Fp: np.ndarray) -> np.ndarray:
+    def _calc_fluxes(
+        self,
+        Ff: np.ndarray,
+        Fp: np.ndarray,
+        Pf: float | None = None,
+        Pp: float | None = None,
+    ) -> np.ndarray:
         """
         Calculate fluxes based on current feed/permeate flows and pressures using the expression:
         J_i = Pi_i * (y_f_i P_f - y_p_i P_p)
@@ -367,7 +463,55 @@ class GasHFM:
         Fp_total = max(float(np.sum(Fp)), eps_total)
         yf = Ff / Ff_total
         yp = Fp / Fp_total
-        return self.Pi * (yf * self.Pf - yp * self.Pp)
+        Pf_local = self.Pf if Pf is None else float(Pf)
+        Pp_local = self.Pp if Pp is None else float(Pp)
+        return self.Pi * (yf * Pf_local - yp * Pp_local)
+
+    def _calc_feed_shell_pressure_derivative(
+        self,
+        Ff: np.ndarray,
+        yf: np.ndarray,
+        Ff_total: float,
+        Tf: float,
+        Pf: float,
+    ) -> float:
+        mu_mix = self.thermo_source.calc_Vis_GAS(mole_fractions=yf)
+        mu = float(mu_mix.value)
+        q_shell = self.thermo_source.calc_gas_volumetric_flow_rate(
+            molar_flow_rate=Ff_total,
+            temperature=Tf,
+            pressure=Pf,
+            R=self.R,
+            gas_model=cast(GasModel, self.gas_model),
+        )
+        q_shell = max(float(q_shell), 1e-30)
+        u_shell = q_shell / float(self.shell_flow_area)
+        mw_mix_kg_per_mol = float(np.sum(yf * self.thermo_source.MW)) / 1000.0
+        rho_shell = Pf * mw_mix_kg_per_mol / (self.R * Tf)
+        return shell_pressure_derivative_laminar(
+            density=rho_shell,
+            velocity=u_shell,
+            hydraulic_diameter=float(self.shell_hydraulic_diameter),
+            mu=mu,
+            axial_sign=1.0,
+        )
+
+    def _calc_permeate_fiber_pressure_squared_derivative(
+        self,
+        Fp_total: float,
+        yp: np.ndarray,
+        Tp: float,
+    ) -> float:
+        mu_mix = self.thermo_source.calc_Vis_GAS(mole_fractions=yp)
+        return gas_fiber_pressure_squared_derivative(
+            mu=float(mu_mix.value),
+            molar_flow_rate=Fp_total,
+            n_fibers=float(self.n_fibers),
+            diameter_inner=float(self.d_inner),
+            temperature=Tp,
+            gas_constant=self.R,
+            axial_sign=float(self.s_p),
+        )
 
     def _calc_fluxes_v0(self, Ff: np.ndarray, Fp: np.ndarray) -> np.ndarray:
         Ff_safe = np.asarray(Ff, dtype=float)
