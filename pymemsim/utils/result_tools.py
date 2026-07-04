@@ -92,15 +92,20 @@ def _compute_gas_volumetric_flow_profile(
     R: float,
     total_flow: np.ndarray,
     temperature: np.ndarray,
-    pressure: float,
+    pressure: Union[float, np.ndarray],
 ) -> np.ndarray:
     out = np.zeros_like(total_flow, dtype=float)
+    pressure_profile = (
+        np.full_like(total_flow, float(pressure), dtype=float)
+        if np.isscalar(pressure)
+        else np.asarray(pressure, dtype=float)
+    )
     for j in range(total_flow.shape[0]):
         out[j] = float(
             thermo_source.calc_gas_volumetric_flow_rate(
                 molar_flow_rate=float(total_flow[j]),
                 temperature=float(temperature[j]),
-                pressure=float(pressure),
+                pressure=float(pressure_profile[j]),
                 R=float(R),
                 gas_model=gas_model,
             )
@@ -159,11 +164,29 @@ def analyze_hfm_result(
         getattr(module, "component_formula_state", _component_labels(components, fallback_count))
     )
     ns = len(component_ids)
-    expected_isothermal = 2 * ns
-    expected_non_isothermal = 2 * ns + 2
+    unit_options = getattr(hfm_module, "unit_options", None)
+    feed_pressure_mode = getattr(
+        unit_options, "feed_pressure_mode", getattr(module, "feed_pressure_mode", "constant")
+    )
+    permeate_pressure_mode = getattr(
+        unit_options, "permeate_pressure_mode", getattr(module, "permeate_pressure_mode", "constant")
+    )
+    has_feed_pressure_state = (
+        getattr(module, "has_feed_pressure_state", False)
+        or feed_pressure_mode == "state_variable"
+    )
+    has_permeate_pressure_state = (
+        getattr(module, "has_permeate_pressure_state", False)
+        or permeate_pressure_mode == "state_variable"
+    )
+    n_pressure_states = int(has_feed_pressure_state) + int(has_permeate_pressure_state)
+    expected_isothermal = 2 * ns + n_pressure_states
+    expected_non_isothermal = 2 * ns + n_pressure_states + 2
     if state.shape[0] not in (expected_isothermal, expected_non_isothermal):
         raise ValueError(
-            f"Unsupported state shape {state.shape}. Expected (2*ns,n) or (2*ns+2,n) with ns={ns}."
+            f"Unsupported state shape {state.shape}. Expected "
+            f"(2*ns+pressure_states,n) or (2*ns+pressure_states+2,n) "
+            f"with ns={ns} and pressure_states={n_pressure_states}."
         )
 
     has_temperature_state = state.shape[0] == expected_non_isothermal
@@ -177,13 +200,27 @@ def analyze_hfm_result(
     Ff_total = np.sum(Ff, axis=0)
     Fp_total = np.sum(Fp, axis=0)
 
+    idx = 2 * ns
+    Pf_profile = np.full_like(
+        span, float(getattr(module, "Pf", np.nan)), dtype=float
+    )
+    Pp_profile = np.full_like(
+        span, float(getattr(module, "Pp", np.nan)), dtype=float
+    )
+    if has_feed_pressure_state:
+        Pf_profile = np.asarray(state[idx, :], dtype=float)
+        idx += 1
+    if has_permeate_pressure_state:
+        Pp_profile = np.asarray(state[idx, :], dtype=float)
+        idx += 1
+
     Tf_profile = (
-        np.asarray(state[2 * ns, :], dtype=float)
+        np.asarray(state[idx, :], dtype=float)
         if has_temperature_state
         else np.full_like(span, float(getattr(module, "Tf_in", np.nan)), dtype=float)
     )
     Tp_profile = (
-        np.asarray(state[2 * ns + 1, :], dtype=float)
+        np.asarray(state[idx + 1, :], dtype=float)
         if has_temperature_state
         else np.full_like(span, float(getattr(module, "Tp_in", np.nan)), dtype=float)
     )
@@ -248,7 +285,7 @@ def analyze_hfm_result(
         Pp = float(getattr(module, "Pp", np.nan))
         Pi = np.asarray(getattr(module, "Pi", np.zeros(ns, dtype=float)), dtype=float)
 
-        driving_force_profile = yf * Pf - yp * Pp
+        driving_force_profile = yf * Pf_profile[None, :] - yp * Pp_profile[None, :]
         driving_force_name = "delta_partial_pressure_Pa"
         flux_profile = Pi[:, None] * driving_force_profile
 
@@ -261,7 +298,7 @@ def analyze_hfm_result(
                 R=R_value,
                 total_flow=Ff_total,
                 temperature=Tf_profile,
-                pressure=Pf,
+                pressure=Pf_profile,
             )
             qp_profile = _compute_gas_volumetric_flow_profile(
                 thermo_source=thermo_source,
@@ -269,7 +306,7 @@ def analyze_hfm_result(
                 R=R_value,
                 total_flow=Fp_total,
                 temperature=Tp_profile,
-                pressure=Pp,
+                pressure=Pp_profile,
             )
             qf_in = float(qf_profile[0])
             qf_out = float(qf_profile[-1])
@@ -451,15 +488,9 @@ def analyze_hfm_result(
     feed_pressure_drop = None
     permeate_pressure_drop = None
     avg_transmembrane_pressure_diff = None
-    Pf_profile = None
-    Pp_profile = None
-    if Pf is not None and Pp is not None:
-        Pf_value = float(Pf)
-        Pp_value = float(Pp)
-        Pf_profile = np.full_like(span, Pf_value, dtype=float)
-        Pp_profile = np.full_like(span, Pp_value, dtype=float)
-        feed_pressure_drop = float(Pf_value - Pf_value)
-        permeate_pressure_drop = float(Pp_value - Pp_value)
+    if np.all(np.isfinite(Pf_profile)) and np.all(np.isfinite(Pp_profile)):
+        feed_pressure_drop = float(Pf_profile[0] - Pf_profile[-1])
+        permeate_pressure_drop = float(Pp_profile[perm_in_idx] - Pp_profile[perm_out_idx])
         avg_transmembrane_pressure_diff = float(np.mean(Pf_profile - Pp_profile))
     else:
         _warn_once(warnings, "Hydraulic pressure metrics are unavailable (missing pressure attributes).")
@@ -523,8 +554,8 @@ def analyze_hfm_result(
         },
         "feed_temperature_profile_K": Tf_profile.tolist() if has_temperature_state else None,
         "permeate_temperature_profile_K": Tp_profile.tolist() if has_temperature_state else None,
-        "feed_pressure_profile_Pa": Pf_profile.tolist() if Pf_profile is not None else None,
-        "permeate_pressure_profile_Pa": Pp_profile.tolist() if Pp_profile is not None else None,
+        "feed_pressure_profile_Pa": Pf_profile.tolist() if np.all(np.isfinite(Pf_profile)) else None,
+        "permeate_pressure_profile_Pa": Pp_profile.tolist() if np.all(np.isfinite(Pp_profile)) else None,
         "feed_volumetric_flow_profile_m3_per_s": qf_profile.tolist() if qf_profile is not None else None,
         "permeate_volumetric_flow_profile_m3_per_s": qp_profile.tolist() if qp_profile is not None else None,
         "driving_force_name": driving_force_name,
@@ -562,7 +593,7 @@ def analyze_hfm_result(
                 component_flows=Ff_in,
                 composition=yf_in,
                 temperature_value=float(Tf_profile[0]),
-                pressure_value=float(Pf) if Pf is not None else None,
+                pressure_value=float(Pf_profile[0]) if np.all(np.isfinite(Pf_profile)) else None,
                 volumetric_flow=qf_in,
             ),
             "retentate_outlet": _stream_dict(
@@ -570,7 +601,7 @@ def analyze_hfm_result(
                 component_flows=Ff_out,
                 composition=yf_out,
                 temperature_value=float(Tf_profile[-1]),
-                pressure_value=float(Pf) if Pf is not None else None,
+                pressure_value=float(Pf_profile[-1]) if np.all(np.isfinite(Pf_profile)) else None,
                 volumetric_flow=qf_out,
             ),
             "permeate_outlet": _stream_dict(
@@ -578,7 +609,7 @@ def analyze_hfm_result(
                 component_flows=Fp_out,
                 composition=yp_out,
                 temperature_value=float(Tp_profile[perm_out_idx]),
-                pressure_value=float(Pp) if Pp is not None else None,
+                pressure_value=float(Pp_profile[perm_out_idx]) if np.all(np.isfinite(Pp_profile)) else None,
                 volumetric_flow=qp_out,
             ),
         },
