@@ -17,7 +17,7 @@ from pyThermoDB import ComponentThermoDB
 from pyThermoDB import build_component_thermodb_from_reference
 from pyreactlab_core.models.reaction import Reaction
 # locals
-from examples.reference import REFERENCE_CONTENT
+from examples.reference_2 import REFERENCE_CONTENT
 
 # check version
 print(ptdb.__version__)
@@ -106,8 +106,15 @@ C3H8 = Component(
     state='g',
 )
 
+# Oxygen
+O2 = Component(
+    name='oxygen',
+    formula='O2',
+    state='g',
+)
+
 # components
-components = [CH4, CO2]
+components = [O2, N2, CH4, CO2]
 
 # NOTE: ignore state properties
 ignore_state_props = ['MW', 'VaPr', 'Cp_IG', 'Vis_GAS']
