@@ -85,18 +85,28 @@ feed_mole_fractions = {
 # }
 
 # feed inlet temperature
-feed_inlet_temperature = Temperature(value=338.15, unit="K")
+feed_inlet_temperature = Temperature(value=298.15, unit="K")
 
 # feed inlet pressure
 feed_pressure = CustomProp(value=405, unit="kPa")
 
 # permeate inlet temperature
-permeate_inlet_temperature = Temperature(value=338.15, unit="K")
+permeate_inlet_temperature = Temperature(value=298.15, unit="K")
 
 # permeate inlet pressure
 permeate_pressure = CustomProp(value=101, unit="kPa")
 
 # NOTE: gas transport coefficients Pi_i (Permeance) for each component i, in units of mol/s.m2.Pa
+# 25C:
+#   K_CO2: 9.43 GPU
+#   K_CH4: 2.63 GPU
+#   alpha_CO2_CH4: 3.58
+
+# 65C:
+#   K_CO2: 17.98 GPU
+#   K_CH4: 6.21 GPU
+#   alpha_CO2_CH4: 2.90
+
 # ! mol/s.m2.Pa
 # gas_transport_coefficients = {
 #     "CO2-g": CustomProp(value=31.60*3.35e-10, unit="mol/s.m2.Pa"),
@@ -105,8 +115,8 @@ permeate_pressure = CustomProp(value=101, unit="kPa")
 
 # ! gpu
 gas_transport_coefficients = {
-    "CO2-g": CustomProp(value=31.60, unit="GPU"),
-    "CH4-g": CustomProp(value=8.81, unit="GPU"),
+    "CO2-g": CustomProp(value=9.43, unit="GPU"),
+    "CH4-g": CustomProp(value=2.63, unit="GPU"),
 }
 
 # NOTE: membrane unit geometry
