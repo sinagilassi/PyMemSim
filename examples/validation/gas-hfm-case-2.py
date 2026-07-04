@@ -1,19 +1,4 @@
 # import packages/modules
-import logging
-import sys
-import warnings
-from datetime import datetime
-from pathlib import Path
-from typing import cast, Literal
-from pythermodb_settings.models import CustomProp, Temperature
-from rich import print
-# ! locals
-from examples.plot.plot_res import plot_hfm_result, plot_hfm_permeate_flow_profile
-from pymemsim.thermo import build_thermo_source
-from pymemsim.models import HollowFiberMembraneOptions, MembraneResult
-from pymemsim import HFM, create_hfm_module
-from pymemsim.utils import analyze_hfm_result, print_hfm_result_tables, save_hfm_analysis_txt
-# ! inputs
 from examples.validation.inputs_case_1 import (
     components,
     heat_transfer_options,
@@ -22,8 +7,26 @@ from examples.validation.inputs_case_1 import (
     model_source,
     COUNTERCURRENT_METHOD,
     length_span,
-    flow_pattern_to_run
+    flow_pattern_to_run,
+    modeling_type,
+    phase,
+    feed_pressure_mode,
+    permeate_pressure_mode,
+    gas_model,
 )
+from pymemsim.utils import analyze_hfm_result, print_hfm_result_tables, save_hfm_analysis_txt
+from pymemsim import HFM, create_hfm_module
+from pymemsim.models import HollowFiberMembraneOptions, MembraneResult
+from pymemsim.thermo import build_thermo_source
+from examples.plot.plot_res import plot_hfm_result, plot_hfm_permeate_flow_profile
+import logging
+import sys
+import warnings
+from datetime import datetime
+from pathlib import Path
+from typing import cast, Literal
+from pythermodb_settings.models import CustomProp, Temperature
+from rich import print
 
 
 # NOTE: example source and kinetics
@@ -33,6 +36,9 @@ EXAMPLES_DIR = Path(__file__).resolve().parents[1]
 for path in (PROJECT_DIR, EXAMPLES_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
+
+# ! locals
+# ! inputs
 
 
 # NOTE: silence library warnings/errors for this example run
@@ -46,14 +52,57 @@ for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pythermocalcdb", "pyreactla
     logging.getLogger(logger_name).setLevel(logging.CRITICAL + 1)
 
 
-def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneResult | None:
+# NOTE: route solver options by flow pattern
+cocurrent_solver_options = {
+    "method": "Radau",
+    "rtol": 1e-6,
+    "atol": 1e-9,
+}
+countercurrent_bvp_solver_options = {
+    "countercurrent_solver": "bvp",
+    "mesh_points": 120,
+    "tol": 1e-3,
+    "bc_tol": 1e-3,
+    "max_nodes": 50000,
+    "verbose": 2,
+    "debug_bc": True,
+}
+countercurrent_shooting_solver_options = {
+    "countercurrent_solver": "shooting",
+    "shooting_ivp_method": "auto",
+    "shooting_ivp_rtol": 1e-6,
+    "shooting_ivp_atol": 1e-9,
+    "shooting_max_nfev": 1200,
+    "shooting_ftol": 1e-8,
+    "shooting_xtol": 1e-8,
+    "shooting_gtol": 1e-8,
+    "shooting_residual_tol": 1e-3,
+    "shooting_multistart": True,
+    "shooting_penalty": 1e3,
+    "shooting_debug": True,
+}
+
+
+def run_case(
+    flow_pattern: str,
+    length_span: tuple[float, float],
+    modeling_type: str,
+    phase: str,
+    feed_pressure_mode: str,
+    permeate_pressure_mode: str,
+    gas_model: str,
+) -> MembraneResult | None:
     # NOTE: membrane unit options per flow pattern
     unit_options = HollowFiberMembraneOptions(
-        modeling_type="scale",
-        phase="gas",
-        feed_pressure_mode="state_variable",
-        permeate_pressure_mode="state_variable",
-        gas_model="ideal",
+        modeling_type=cast(Literal["physical", "scale"], modeling_type),
+        phase=cast(Literal["gas", "liquid"], phase),
+        feed_pressure_mode=cast(
+            Literal["constant", "state_variable"], feed_pressure_mode
+        ),
+        permeate_pressure_mode=cast(
+            Literal["constant", "state_variable"], permeate_pressure_mode
+        ),
+        gas_model=cast(Literal["ideal", "real"], gas_model),
         flow_pattern=cast(
             Literal["co-current", "counter-current"], flow_pattern),
     )
@@ -74,36 +123,6 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
         model_inputs=model_inputs,
         thermo_source=thermo_source,
     )
-
-    # NOTE: route solver options by flow pattern
-    cocurrent_solver_options = {
-        "method": "Radau",
-        "rtol": 1e-6,
-        "atol": 1e-9,
-    }
-    countercurrent_bvp_solver_options = {
-        "countercurrent_solver": "bvp",
-        "mesh_points": 120,
-        "tol": 1e-3,
-        "bc_tol": 1e-3,
-        "max_nodes": 50000,
-        "verbose": 2,
-        "debug_bc": True,
-    }
-    countercurrent_shooting_solver_options = {
-        "countercurrent_solver": "shooting",
-        "shooting_ivp_method": "auto",
-        "shooting_ivp_rtol": 1e-6,
-        "shooting_ivp_atol": 1e-9,
-        "shooting_max_nfev": 1200,
-        "shooting_ftol": 1e-8,
-        "shooting_xtol": 1e-8,
-        "shooting_gtol": 1e-8,
-        "shooting_residual_tol": 1e-3,
-        "shooting_multistart": True,
-        "shooting_penalty": 1e3,
-        "shooting_debug": True,
-    }
 
     if flow_pattern == "co-current":
         solver_options = cocurrent_solver_options
@@ -154,7 +173,15 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
 
 
 print("[bold green]Running gas HFM example for both flow patterns...[/bold green]")
-res_case = run_case(flow_pattern=flow_pattern_to_run, length_span=length_span)
+res_case = run_case(
+    flow_pattern=flow_pattern_to_run,
+    length_span=length_span,
+    modeling_type=modeling_type,
+    phase=phase,
+    feed_pressure_mode=feed_pressure_mode,
+    permeate_pressure_mode=permeate_pressure_mode,
+    gas_model=gas_model,
+)
 
 if res_case is not None:
     plot_hfm_result(
