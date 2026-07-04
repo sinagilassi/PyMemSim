@@ -1,7 +1,7 @@
 # import libs
 import logging
 import numpy as np
-from typing import List, Dict, Any, cast, Optional
+from typing import List, Dict, Any, cast, Optional, Tuple
 from pythermodb_settings.models import Component, Temperature, Pressure, CustomProperty, ComponentKey
 from pyThermoLinkDB.thermo import Source
 from pyThermoLinkDB.models import ModelSource
@@ -18,6 +18,7 @@ from ..sources.interface import (
 from ..models.heat import HeatTransferOptions
 from ..utils.tools import config_components_property
 from ..utils.unit_tools import to_J_per_mol, to_g_per_mol
+import pycuc
 # ! membrane options
 from ..models.hfm import HollowFiberMembraneOptions
 
@@ -31,6 +32,8 @@ class ThermoModelSource:
     Cp_IG_src: Dict[str, ComponentEquationSource] = {}
     Cp_LIQ_src: Dict[str, ComponentEquationSource] = {}
     rho_LIQ_src: Dict[str, ComponentEquationSource] = {}
+    Vis_GAS_src: Dict[str, Dict[str, Any]] = {}
+    Vis_LIQ_src: Dict[str, Dict[str, Any]] = {}
     EnFo_IG_298_src: Dict[str, Dict[str, Any]] = {}
     MW_src: Dict[str, Dict[str, Any]] = {}
     # ! properties
@@ -38,6 +41,10 @@ class ThermoModelSource:
     EnFo_IG_298_comp: Dict[str, float] = {}
     MW: np.ndarray = np.array([])
     MW_comp: Dict[str, float] = {}
+    Vis_GAS: List[CustomProperty] = []
+    Vis_GAS_comp: Dict[str, CustomProperty] = {}
+    Vis_LIQ: List[CustomProperty] = []
+    Vis_LIQ_comp: Dict[str, CustomProperty] = {}
 
     def __init__(
         self,
@@ -121,6 +128,32 @@ class ThermoModelSource:
                     unit_conversion_func=to_J_per_mol
                 )
 
+        if self.phase == "gas":
+            self.MW_src = self.prop_dt_src(
+                component_ids=self.component_ids,
+                prop_name="MW"
+            )
+            (
+                self.MW,
+                self.MW_comp
+            ) = config_components_property(
+                component_ids=self.component_ids,
+                prop_source=self.MW_src,
+                unit_conversion_func=to_g_per_mol
+            )
+            self.Vis_GAS_src = self.prop_dt_src(
+                component_ids=self.component_ids,
+                prop_name="Vis_GAS"
+            )
+            (
+                self.Vis_GAS,
+                self.Vis_GAS_comp
+            ) = self._config_components_custom_property(
+                prop_source=self.Vis_GAS_src,
+                output_unit="Pa.s",
+                symbol="Vis_GAS",
+            )
+
         if self.phase == "liquid":
             # MW source
             self.MW_src = self.prop_dt_src(
@@ -144,6 +177,19 @@ class ThermoModelSource:
                 self.rho_LIQ_src: Dict[str, ComponentEquationSource] = self.prop_eq_src(
                     prop_name="rho_LIQ"
                 )
+
+            self.Vis_LIQ_src = self.prop_dt_src(
+                component_ids=self.component_ids,
+                prop_name="Vis_LIQ"
+            )
+            (
+                self.Vis_LIQ,
+                self.Vis_LIQ_comp
+            ) = self._config_components_custom_property(
+                prop_source=self.Vis_LIQ_src,
+                output_unit="Pa.s",
+                symbol="Vis_LIQ",
+            )
 
             # NOTE: heat capacity
             if self.heat_transfer_options.heat_transfer_mode == "non-isothermal":
@@ -206,6 +252,40 @@ class ThermoModelSource:
             return {}
 
         return dt_src
+
+    def _config_components_custom_property(
+        self,
+        prop_source: Dict[str, Dict[str, Any]],
+        output_unit: str,
+        symbol: str,
+    ) -> Tuple[List[CustomProperty], Dict[str, CustomProperty]]:
+        values: List[CustomProperty] = []
+        comp_values: Dict[str, CustomProperty] = {}
+
+        for comp in self.component_ids:
+            dt_src = prop_source.get(comp)
+            if dt_src is None:
+                return [], {}
+
+            value = dt_src.get("value")
+            unit = dt_src.get("unit")
+            if value is None or unit is None:
+                return [], {}
+
+            value_out = pycuc.convert_from_to(
+                value=float(value),
+                from_unit=str(unit),
+                to_unit=output_unit,
+            )
+            prop = CustomProperty(
+                value=float(value_out),
+                unit=output_unit,
+                symbol=symbol,
+            )
+            values.append(prop)
+            comp_values[comp] = prop
+
+        return values, comp_values
 
     # SECTION: Model source configurations
     def _get_args_units(
