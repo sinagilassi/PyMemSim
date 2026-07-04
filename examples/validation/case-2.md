@@ -1,5 +1,9 @@
 ## Case 2 / Unit 2
 
+### Flow specification
+
+- flow pattern: counter-current
+
 ### Membrane module properties
 
 - Number of fibers (nf): 270
@@ -28,5 +32,6 @@
 
 - Unit: GPU
 
-- O2: 9.30 GPU
-- N2: 1.80 GPU
+- CO2: 204.20 GPU
+- O2: 60.20 GPU
+- N2: 13.10 GPU

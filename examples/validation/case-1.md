@@ -1,5 +1,9 @@
 ## Case 1 / Unit 1
 
+### Flow specification
+
+- flow pattern: co-current
+
 ### Membrane module properties
 
 - Number of fibers (nf): 100
