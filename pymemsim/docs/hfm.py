@@ -70,6 +70,9 @@ class HFM:
             raise ValueError(
                 "Expected state history with shape (n_states, n_points).")
 
+        if isinstance(self.module, GasHFM) and not isinstance(self.module, GasHFMX):
+            return self._gas_physical_state_to_public(state_arr)
+
         if not isinstance(self.module, (GasHFMX, LiquidHFMX)):
             return state_arr
 
@@ -79,8 +82,12 @@ class HFM:
             y_scaled = state_arr[:, j]
 
             if isinstance(self.module, (GasHFMX)):
-                ff, fp, tf, tp = self.module._unscale_state(y_scaled)
+                ff, fp, pf, pp2, tf, tp = self.module._unscale_state_full(y_scaled)
                 y_parts = [ff, fp]
+                if getattr(self.module, "has_feed_pressure_state", False):
+                    y_parts.append(np.array([pf], dtype=float))
+                if getattr(self.module, "has_permeate_pressure_state", False):
+                    y_parts.append(np.array([np.sqrt(max(pp2, 0.0))], dtype=float))
                 if self.module.heat_transfer_mode == "non-isothermal":
                     y_parts.append(np.array([tf, tp], dtype=float))
             else:
@@ -94,6 +101,29 @@ class HFM:
             physical_cols.append(y_physical)
 
         return np.column_stack(physical_cols)
+
+    def _gas_physical_state_to_public(self, state_arr: np.ndarray) -> np.ndarray:
+        if not (
+            getattr(self.module, "has_feed_pressure_state", False) or
+            getattr(self.module, "has_permeate_pressure_state", False)
+        ):
+            return state_arr
+
+        ns = self.module.component_num
+        idx = 2 * ns
+        parts = [state_arr[:ns, :], state_arr[ns:2 * ns, :]]
+
+        if getattr(self.module, "has_feed_pressure_state", False):
+            parts.append(state_arr[idx:idx + 1, :])
+            idx += 1
+        if getattr(self.module, "has_permeate_pressure_state", False):
+            pp = np.sqrt(np.maximum(state_arr[idx:idx + 1, :], 0.0))
+            parts.append(pp)
+            idx += 1
+        if self.module.heat_transfer_mode == "non-isothermal":
+            parts.append(state_arr[idx:idx + 2, :])
+
+        return np.vstack(parts)
 
     # NOTE: this method creates the appropriate HFM module instance based on the specified phase and modeling type. It checks the combination of phase (gas or liquid) and modeling type (physical or scale) and instantiates the corresponding class (GasHFM, GasHFMX, LiquidHFM, or LiquidHFMX) with the necessary inputs. If the combination is not implemented, it raises a NotImplementedError.
     def _create_module(self) -> GasHFM | GasHFMX | LiquidHFM | LiquidHFMX:
