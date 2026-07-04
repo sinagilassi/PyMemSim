@@ -26,7 +26,6 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import cast, Literal
-from pythermodb_settings.models import CustomProp, Temperature
 from rich import print
 
 
