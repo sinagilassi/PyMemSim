@@ -140,10 +140,11 @@ class GasHFMX(GasHFM):
         if self.heat_transfer_mode == "non-isothermal":
             theta_f = float(y_scaled[idx])
             theta_p = float(y_scaled[idx + 1])
+            temperature_floor = float(getattr(self, "temperature_floor", 100.0))
             Tf = float(smooth_floor(self.Tf_scale_ref +
-                       self.T_scale * theta_f, xmin=1.0, s=1e-3))
+                       self.T_scale * theta_f, xmin=temperature_floor, s=1e-3))
             Tp = float(smooth_floor(self.Tp_scale_ref +
-                       self.T_scale * theta_p, xmin=1.0, s=1e-3))
+                       self.T_scale * theta_p, xmin=temperature_floor, s=1e-3))
         else:
             Tf = float(getattr(self, "Tf_in", 0.0))
             Tp = float(getattr(self, "Tp_in", 0.0))
