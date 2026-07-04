@@ -13,6 +13,7 @@ from examples.validation.inputs_case_1 import (
     feed_pressure_mode,
     permeate_pressure_mode,
     gas_model,
+    target_component,
 )
 from pymemsim.utils import analyze_hfm_result, print_hfm_result_tables, save_hfm_analysis_txt
 from pymemsim import HFM, create_hfm_module
@@ -51,8 +52,9 @@ for logger_name in ("pyThermoDB", "pyThermoLinkDB", "pythermocalcdb", "pyreactla
         continue
     logging.getLogger(logger_name).setLevel(logging.CRITICAL + 1)
 
-
-# NOTE: route solver options by flow pattern
+# ===================================================
+# SECTION: Solver Options
+# ===================================================
 cocurrent_solver_options = {
     "method": "Radau",
     "rtol": 1e-6,
@@ -82,6 +84,10 @@ countercurrent_shooting_solver_options = {
     "shooting_debug": True,
 }
 
+# ===================================================
+# SECTION: Run case
+# ===================================================
+
 
 def run_case(
     flow_pattern: str,
@@ -91,6 +97,7 @@ def run_case(
     feed_pressure_mode: str,
     permeate_pressure_mode: str,
     gas_model: str,
+    target_component: str,
 ) -> MembraneResult | None:
     # NOTE: membrane unit options per flow pattern
     unit_options = HollowFiberMembraneOptions(
@@ -157,7 +164,7 @@ def run_case(
     analysis = analyze_hfm_result(
         result=simulation_results,
         hfm_module=hfm_module,
-        target_component="CO2-g",
+        target_component=target_component,
     )
     print("\n[bold magenta]Analysis of results:[/bold magenta]")
     print(analysis)
@@ -181,6 +188,7 @@ res_case = run_case(
     feed_pressure_mode=feed_pressure_mode,
     permeate_pressure_mode=permeate_pressure_mode,
     gas_model=gas_model,
+    target_component=target_component,
 )
 
 if res_case is not None:
