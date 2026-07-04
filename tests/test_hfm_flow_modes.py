@@ -427,6 +427,28 @@ def test_scaled_result_converts_pressure_states_to_physical_pressure():
     assert np.isclose(public[3, 0], 90000.0)
 
 
+def test_scaled_gas_temperature_unscale_uses_thermo_safe_floor():
+    module = GasHFMX.__new__(GasHFMX)
+    module.component_num = 1
+    module.ns = 1
+    module.has_feed_pressure_state = False
+    module.has_permeate_pressure_state = False
+    module.heat_transfer_mode = "non-isothermal"
+    module.Ff_scale = np.array([1.0], dtype=float)
+    module.Fp_scale = np.array([1.0], dtype=float)
+    module.Tf_scale_ref = 303.0
+    module.Tp_scale_ref = 303.0
+    module.T_scale = 100.0
+    module.temperature_floor = 100.0
+
+    y_scaled = np.array([1.0, 1.0, -10.0, -10.0], dtype=float)
+
+    _, _, _, _, tf, tp = module._unscale_state_full(y_scaled)
+
+    assert tf >= 100.0
+    assert tp >= 100.0
+
+
 class _expect_raises:
     def __init__(self, exc_type: type[BaseException], contains: str):
         self.exc_type = exc_type
