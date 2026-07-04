@@ -62,7 +62,11 @@ thermo_inputs = {}
 # feed_inlet_flow = CustomProp(value=feed_molar_flow.value, unit="mol/s")
 
 # ! method 2 (alternative): directly specify feed molar flow rate
-feed_inlet_flow = CustomProp(value=0.002500, unit="mol/s")
+feed_inlet_flows = [
+    0.002500, 0.001500, 0.000140, 0.000130, 0.000110,
+    0.000090, 0.000070, 0.000040, 0.000030
+]
+feed_inlet_flow = CustomProp(value=feed_inlet_flows[5], unit="mol/s")
 
 # feed specification mode: feed mole fractions
 feed_mole_fractions = {
@@ -71,22 +75,29 @@ feed_mole_fractions = {
 }
 
 # feed inlet temperature
-feed_inlet_temperature = Temperature(value=298.15, unit="K")
+feed_inlet_temperature = Temperature(value=338.15, unit="K")
 
 # feed inlet pressure
-feed_pressure = CustomProp(value=405, unit="kPa")
+feed_pressure = CustomProp(value=401, unit="kPa")
 
 # permeate inlet temperature
-permeate_inlet_temperature = Temperature(value=298.15, unit="K")
+permeate_inlet_temperature = Temperature(value=338.15, unit="K")
 
 # permeate inlet pressure
 permeate_pressure = CustomProp(value=101, unit="kPa")
 
 # NOTE: gas transport coefficients Pi_i (Permeance) for each component i
 # ! gpu
+# >>> at 25°C
+# gas_transport_coefficients = {
+#     "CO2-g": CustomProp(value=9.43, unit="GPU"),
+#     "CH4-g": CustomProp(value=2.63, unit="GPU"),
+# }
+
+# >>> at 65°C
 gas_transport_coefficients = {
-    "CO2-g": CustomProp(value=9.43, unit="GPU"),
-    "CH4-g": CustomProp(value=2.63, unit="GPU"),
+    "CO2-g": CustomProp(value=17.98, unit="GPU"),
+    "CH4-g": CustomProp(value=6.21, unit="GPU"),
 }
 
 # NOTE: membrane unit geometry
