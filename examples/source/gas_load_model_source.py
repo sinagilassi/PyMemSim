@@ -114,6 +114,12 @@ C3H8 = Component(
     state='g',
 )
 
+O2 = Component(
+    name='oxygen',
+    formula='O2',
+    state='g',
+)
+
 # components
 # components = [CO2, H2, CH3OH, H2O]
 
@@ -161,6 +167,10 @@ C3H8_thermodb_file = os.path.join(
 N2_thermodb_file = os.path.join(
     thermodb_dir,
     'nitrogen.pkl'
+)
+O2_thermodb_file = os.path.join(
+    thermodb_dir,
+    'oxygen.pkl'
 )
 
 # =======================================
@@ -217,6 +227,11 @@ N2_thermodb: ComponentThermoDBSource = ComponentThermoDBSource(
     source=N2_thermodb_file
 )
 
+O2_thermodb: ComponentThermoDBSource = ComponentThermoDBSource(
+    component=O2,
+    source=O2_thermodb_file
+)
+
 # NOTE: load and build model source
 # NOTE: debug timing for model source build
 _build_t0 = time.perf_counter()
@@ -247,6 +262,7 @@ model_source: ModelSource = load_and_build_model_source(
         CO2_thermodb,
         N2_thermodb,
         CH4_thermodb,
+        O2_thermodb
     ],
     original_equation_label=False
 )
