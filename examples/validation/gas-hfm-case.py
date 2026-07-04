@@ -1,5 +1,5 @@
 # import packages/modules
-from examples.validation.inputs_case_1 import (
+from examples.validation.inputs_case_2 import (
     components,
     heat_transfer_options,
     thermo_inputs,

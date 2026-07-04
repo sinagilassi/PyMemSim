@@ -16,7 +16,7 @@
 
 ### Feed specifications
 
-- Temperature (T): 303 K
+- Temperature (T): 303.15 K
 - Feed pressure (Ps): 1570 kPa
 - Permeate pressure (Pt): 101.3 kPa
 
@@ -32,6 +32,6 @@
 
 - Unit: GPU
 
-- CO2: 204.20 GPU
-- O2: 60.20 GPU
-- N2: 13.10 GPU
+- CO2: 61.0 GPU
+- O2: 18.0 GPU
+- N2: 3.9 GPU
