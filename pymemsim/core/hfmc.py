@@ -7,7 +7,7 @@ from pythermodb_settings.models import Component, ComponentKey, Temperature, Cus
 import pycuc
 # locals
 from ..models.heat import HeatTransferOptions
-from ..utils.unit_tools import to_W_per_m2_K, from_gpu_to_mol_per_s_m2_Pa
+from ..utils.unit_tools import to_W_per_m2_K, from_gpu_to_mol_per_s_m2_Pa, to_m
 from .mc import MembraneCore
 from ..models.hfm import HollowFiberMembraneOptions, HollowFiberMembraneModuleGeometry
 from .hfm_module import HFMModule
@@ -57,15 +57,6 @@ class HFMCore(MembraneCore):
         self.gas_heat_capacity_mode = unit_options.gas_heat_capacity_mode
         self.liquid_heat_capacity_mode = unit_options.liquid_heat_capacity_mode
         self.liquid_density_mode = unit_options.liquid_density_mode
-
-        # NOTE: this pass supports only constant pressure on both sides.
-        if (
-            self.feed_pressure_mode != "constant" or
-            self.permeate_pressure_mode != "constant"
-        ):
-            raise NotImplementedError(
-                "HFM currently supports only constant feed/permeate pressure modes."
-            )
 
         # SECTION: side-specific inlet states with backward compatibility keys
         # ! feed inlet total flow [mol/s] when feed is specified via total flow + composition
@@ -126,6 +117,9 @@ class HFMCore(MembraneCore):
         # SECTION: membrane module properties
         # ! membrane area per unit length [m] (= m2/m)
         self.membrane_area_per_length = self._config_membrane_area_per_length()
+
+        # ! geometry values needed by pressure-drop models
+        self._config_pressure_drop_geometry()
 
         # SECTION: membrane transport and thermal parameters
         # ! overall heat-transfer coefficient [W/m2.K]
@@ -205,6 +199,14 @@ class HFMCore(MembraneCore):
         if self.feed_pressure <= 0.0 or self.permeate_pressure <= 0.0:
             raise ValueError(
                 "feed_pressure and permeate_pressure must be positive."
+            )
+        if self.feed_pressure_mode not in ("constant", "state_variable"):
+            raise ValueError(
+                "feed_pressure_mode must be 'constant' or 'state_variable'."
+            )
+        if self.permeate_pressure_mode not in ("constant", "state_variable"):
+            raise ValueError(
+                "permeate_pressure_mode must be 'constant' or 'state_variable'."
             )
 
     # SECTION: side-input helpers
@@ -507,6 +509,123 @@ class HFMCore(MembraneCore):
             module_diameter=geometry_model.module_diameter,
         )
         return float(module.properties["area_per_unit_length"])
+
+    def _config_pressure_drop_geometry(self) -> None:
+        self.number_of_fibers = None
+        self.fiber_inner_diameter = None
+        self.fiber_outer_diameter = None
+        self.module_diameter = None
+        self.shell_free_area = None
+        self.porosity = None
+        self.shell_hydraulic_diameter = None
+
+        pressure_drop_required = (
+            self.feed_pressure_mode == "state_variable" or
+            self.permeate_pressure_mode == "state_variable"
+        )
+
+        geometry = None
+        if "module_geometry" in self.model_inputs_keys:
+            geometry = self.model_inputs["module_geometry"]
+            if not isinstance(geometry, HollowFiberMembraneModuleGeometry):
+                raise ValueError(
+                    "'module_geometry' must be an instance of HollowFiberMembraneModuleGeometry."
+                )
+            number_of_fibers = geometry.number_of_fibers
+            fiber_outer_diameter = geometry.fiber_outer_diameter
+            fiber_inner_diameter = geometry.fiber_inner_diameter
+            fiber_length = geometry.fiber_length
+            module_diameter = geometry.module_diameter
+        else:
+            geometry_keys = (
+                "number_of_fibers",
+                "fiber_outer_diameter",
+                "fiber_inner_diameter",
+                "fiber_length",
+                "module_diameter",
+            )
+            has_any_geometry = any(
+                key in self.model_inputs_keys for key in geometry_keys
+            )
+            if not has_any_geometry:
+                if pressure_drop_required:
+                    raise ValueError(
+                        "Full membrane geometry is required when a pressure mode is 'state_variable'."
+                    )
+                return
+
+            missing = [
+                key for key in geometry_keys if key not in self.model_inputs_keys
+            ]
+            if len(missing) > 0:
+                if pressure_drop_required:
+                    raise ValueError(
+                        "Incomplete membrane geometry specification for pressure drop. "
+                        f"Missing keys: {missing}"
+                    )
+                return
+
+            number_of_fibers = self.model_inputs["number_of_fibers"]
+            fiber_outer_diameter = self.model_inputs["fiber_outer_diameter"]
+            fiber_inner_diameter = self.model_inputs["fiber_inner_diameter"]
+            fiber_length = self.model_inputs["fiber_length"]
+            module_diameter = self.model_inputs["module_diameter"]
+
+        module = HFMModule(
+            number_of_fibers=number_of_fibers,
+            fiber_outer_diameter=fiber_outer_diameter,
+            fiber_inner_diameter=fiber_inner_diameter,
+            fiber_length=fiber_length,
+            module_diameter=module_diameter,
+        )
+
+        self.number_of_fibers = float(number_of_fibers.value)
+        self.fiber_inner_diameter = float(
+            to_m(fiber_inner_diameter.value, fiber_inner_diameter.unit)
+        )
+        self.fiber_outer_diameter = float(
+            to_m(fiber_outer_diameter.value, fiber_outer_diameter.unit)
+        )
+        self.module_diameter = float(
+            to_m(module_diameter.value, module_diameter.unit)
+        )
+        self.shell_free_area = float(module.properties["shell_free_area"])
+        self.porosity = float(module.properties["porosity"])
+
+        if "shell_hydraulic_diameter" in self.model_inputs_keys:
+            raw_value, raw_unit = self._extract_value_unit(
+                self.model_inputs["shell_hydraulic_diameter"]
+            )
+            self.shell_hydraulic_diameter = float(
+                to_m(raw_value, raw_unit.strip() or "m")
+            )
+        else:
+            wetted_perimeter = (
+                self.number_of_fibers * np.pi * self.fiber_outer_diameter
+            )
+            if wetted_perimeter <= 0.0:
+                raise ValueError(
+                    "Shell wetted perimeter must be positive for pressure drop."
+                )
+            self.shell_hydraulic_diameter = float(
+                4.0 * self.shell_free_area / wetted_perimeter
+            )
+
+        if pressure_drop_required:
+            if self.number_of_fibers <= 0.0:
+                raise ValueError("number_of_fibers must be positive.")
+            if self.fiber_inner_diameter <= 0.0:
+                raise ValueError("fiber_inner_diameter must be positive.")
+            if self.fiber_outer_diameter <= 0.0:
+                raise ValueError("fiber_outer_diameter must be positive.")
+            if self.module_diameter <= 0.0:
+                raise ValueError("module_diameter must be positive.")
+            if self.shell_free_area <= 0.0:
+                raise ValueError("shell_free_area must be positive.")
+            if self.shell_hydraulic_diameter <= 0.0:
+                raise ValueError(
+                    "shell_hydraulic_diameter must be positive."
+                )
 
     # NOTE: configure optional overall heat-transfer coefficient [W/m2.K].
     def _config_optional_per_area_u(self, key: str, default_value: float) -> float:
