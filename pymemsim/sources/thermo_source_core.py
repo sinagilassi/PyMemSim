@@ -172,6 +172,28 @@ class ThermoSourceCore(ThermoCalc):
         self.MW = self.thermo_model_source.MW
         self.MW_comp = self.thermo_model_source.MW_comp
 
+        # SECTION: viscosity
+        self.Vis_GAS: List[CustomProp] = (
+            self.thermo_model_source.Vis_GAS
+            if len(self.thermo_model_source.Vis_GAS) > 0
+            else self.thermo_model_inputs.gas_viscosity_constant_values
+        )
+        self.Vis_GAS_comp: Dict[str, CustomProp] = (
+            self.thermo_model_source.Vis_GAS_comp
+            if len(self.thermo_model_source.Vis_GAS_comp) > 0
+            else self.thermo_model_inputs.gas_viscosity_constant_comp
+        )
+        self.Vis_LIQ: List[CustomProp] = (
+            self.thermo_model_source.Vis_LIQ
+            if len(self.thermo_model_source.Vis_LIQ) > 0
+            else self.thermo_model_inputs.liquid_viscosity_constant_values
+        )
+        self.Vis_LIQ_comp: Dict[str, CustomProp] = (
+            self.thermo_model_source.Vis_LIQ_comp
+            if len(self.thermo_model_source.Vis_LIQ_comp) > 0
+            else self.thermo_model_inputs.liquid_viscosity_constant_comp
+        )
+
         # SECTION: liquid density
         self.rho_LIQ_src: Dict[
             str,
@@ -1119,12 +1141,51 @@ class ThermoSourceCore(ThermoCalc):
 
     # SECTION: Calculate Viscosity
     def calc_Vis_GAS(
-            self
-    ):
-        pass
+            self,
+            mole_fractions: np.ndarray | List[float],
+    ) -> CustomProp:
+        if len(self.Vis_GAS) == 0:
+            raise ValueError(
+                "Gas viscosity data is required for gas pressure drop. "
+                "Provide Vis_GAS in model_source or gas_viscosity in thermo_inputs."
+            )
+        if self.MW is None or len(self.MW) == 0:
+            raise ValueError(
+                "Molecular weights are required for gas mixture viscosity."
+            )
+
+        mw_props = [
+            CustomProp(value=float(mw), unit="g/mol")
+            for mw in np.asarray(self.MW, dtype=float)
+        ]
+        res = calc_gas_mixture_viscosity(
+            mole_fractions=list(np.asarray(mole_fractions, dtype=float)),
+            viscosities=self.Vis_GAS,
+            molecular_weights=mw_props,
+            mode="wilke",
+            normalize=True,
+        )
+        if res is None:
+            raise ValueError("Failed to calculate gas mixture viscosity.")
+        return res
 
     # ! calculate liquid viscosity
     def calc_Vis_LIQ(
-            self
-    ):
-        pass
+            self,
+            mole_fractions: np.ndarray | List[float],
+    ) -> CustomProp:
+        if len(self.Vis_LIQ) == 0:
+            raise ValueError(
+                "Liquid viscosity data is required for liquid pressure drop. "
+                "Provide Vis_LIQ in model_source or liquid_viscosity in thermo_inputs."
+            )
+
+        res = calc_liquid_mixture_viscosity(
+            mole_fractions=list(np.asarray(mole_fractions, dtype=float)),
+            viscosities=self.Vis_LIQ,
+            mode="log",
+            normalize=True,
+        )
+        if res is None:
+            raise ValueError("Failed to calculate liquid mixture viscosity.")
+        return res
