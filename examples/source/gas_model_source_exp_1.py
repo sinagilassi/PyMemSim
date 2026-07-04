@@ -107,10 +107,10 @@ C3H8 = Component(
 )
 
 # components
-components = [CH4, N2, C2H6, C3H8]
+components = [CH4, CO2]
 
 # NOTE: ignore state properties
-ignore_state_props = ['MW', 'VaPr', 'Cp_IG']
+ignore_state_props = ['MW', 'VaPr', 'Cp_IG', 'Vis_GAS']
 
 # ====================================================
 # SECTION: build components thermodb
