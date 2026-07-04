@@ -1118,7 +1118,7 @@ class ThermoSourceCore(ThermoCalc):
         return res_comp, res
 
     # SECTION: Calculate Viscosity
-    def calc_Vis_IG(
+    def calc_Vis_GAS(
             self
     ):
         pass
