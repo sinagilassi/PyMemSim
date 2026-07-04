@@ -139,6 +139,7 @@ COUNTERCURRENT_METHOD = "bvp"  # "bvp" | "shooting"
 # NOTE: length span for the simulation (in meters)
 length_span = (0.0, 0.15)  # [m]
 flow_pattern_to_run = "co-current"
+target_component = "CO2-g"
 
 # ====================================================
 # SECTION: hollow fiber membrane options
