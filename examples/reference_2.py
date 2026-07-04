@@ -407,4 +407,38 @@ REFERENCES:
             - [36,'benzene','C6H6','l',502.4341,531.5958,-663.9853,469.5977,562.014,306.28,1]
             - [37,'toluene','C6H5—CH3','l',439.5835,839.1558,-1234.8445,797.8741,591.749,292.12,1]
             - [38,'p-xylene','C8H10','l',660.6612,-279.7990,602.9859,-192.8244,616.250,280.90,1]
+        gas-viscosity-data:
+          TABLE-ID: 7
+          DESCRIPTION:
+            This table provides pure-component gas viscosity (Vis_GAS) in Pa.s at 300 K and 1 bar.
+            Values are reference-quality gas viscosities based on NIST Chemistry WebBook/REFPROP-style data.
+          DATA: []
+          STRUCTURE:
+            COLUMNS: [No.,Name,Formula,State,Gas-Viscosity,Temperature,Pressure,Source]
+            SYMBOL: [None,None,None,None,Vis_GAS,T,P,None]
+            UNIT: [None,None,None,None,Pa.s,K,bar,None]
+            CONVERSION: [None,None,None,None,1,1,1,None]
+          VALUES:
+            - [1,'carbon dioxide','CO2','g',1.500E-05,300,1,'NIST Chemistry WebBook SRD 69, thermophysical fluid data']
+            - [2,'methane','CH4','g',1.119E-05,300,1,'NIST Chemistry WebBook SRD 69, thermophysical fluid data']
+            - [3,'nitrogen','N2','g',1.789E-05,300,1,'NIST Chemistry WebBook SRD 69, thermophysical fluid data']
+            - [4,'oxygen','O2','g',2.079E-05,300,1,'NIST Chemistry WebBook SRD 69, thermophysical fluid data']
+            - [5,'hydrogen','H2','g',8.938E-06,300,1,'NIST Chemistry WebBook SRD 69, thermophysical fluid data']
+        liquid-viscosity-data:
+          TABLE-ID: 8
+          DESCRIPTION:
+            This table provides pure-component liquid viscosity (Vis_LIQ) in Pa.s near 298.15 K and 1 atm.
+          DATA: []
+          STRUCTURE:
+            COLUMNS: [No.,Name,Formula,State,Liquid-Viscosity,Temperature,Pressure,Source]
+            SYMBOL: [None,None,None,None,Vis_LIQ,T,P,None]
+            UNIT: [None,None,None,None,Pa.s,K,atm,None]
+            CONVERSION: [None,None,None,None,1,1,1,None]
+          VALUES:
+            - [1,'water','H2O','l',8.9002E-04,298.15,1,'CRC/NIST tabulated value at 25 C']
+            - [2,'methanol','CH3OH','l',5.5300E-04,298.15,1,'CRC/List of viscosities tabulated value at 25 C']
+            - [3,'ethanol','C2H6O','l',1.0740E-03,298.15,1,'CRC/List of viscosities tabulated value at 25 C']
+            - [4,'benzene','C6H6','l',6.0400E-04,298.15,1,'CRC/List of viscosities tabulated value at 25 C']
+            - [5,'acetic acid','C2H4O2','l',1.0560E-03,298.15,1,'CRC/List of viscosities tabulated value at 25 C']
+            - [6,'ethyl acetate','C4H8O2','l',4.2600E-04,298.15,1,'CRC/Lange tabulated value near 25 C']
 """
