@@ -66,8 +66,8 @@ thermo_inputs = {}
 # CustomProp(value=0.0004607787955150942, unit='mol/s')
 feed_inlet_flows = [0.00050, 0.000440, 0.0001,
                     0.00005, 0.00004, 0.000035,
-                    0.000030, 0.000025]  # [mol/s]
-feed_inlet_flow = CustomProp(value=feed_inlet_flows[0], unit="mol/s")
+                    0.000030, 0.000025, 0.000023]  # [mol/s]
+feed_inlet_flow = CustomProp(value=feed_inlet_flows[8], unit="mol/s")
 
 # feed specification mode: feed mole fractions
 feed_mole_fractions = {
