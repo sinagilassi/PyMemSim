@@ -41,7 +41,7 @@ components = [CO2, O2, N2]
 
 # NOTE: heat-transfer options
 heat_transfer_options = HeatTransferOptions(
-    heat_transfer_mode="non-isothermal",
+    heat_transfer_mode="isothermal",
     heat_transfer_coefficient=CustomProp(value=100.0, unit="W/m2.K"),
     heat_transfer_area=CustomProp(value=2.0, unit="m2"),
     jacket_temperature=Temperature(value=330.0, unit="K"),
@@ -64,7 +64,8 @@ thermo_inputs = {}
 # ! method 2 (alternative): directly specify feed molar flow rate
 # CustomProp(value=0.000767, unit='mol/s')
 # CustomProp(value=0.000270, unit='mol/s')
-feed_inlet_flows = [0.000270]
+feed_inlet_flows = [0.000220
+                    ]
 feed_inlet_flow = CustomProp(value=feed_inlet_flows[0], unit="mol/s")
 
 # feed specification mode: feed mole fractions

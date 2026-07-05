@@ -1,5 +1,5 @@
 # import packages/modules
-from examples.validation.inputs_case_2 import (
+from examples.validation.inputs_case_3 import (
     components,
     heat_transfer_options,
     thermo_inputs,
@@ -57,10 +57,10 @@ cocurrent_solver_options = {
 }
 countercurrent_bvp_solver_options = {
     "countercurrent_solver": "bvp",
-    "mesh_points": 120,
-    "tol": 1e-3,
-    "bc_tol": 1e-3,
-    "max_nodes": 50000,
+    "mesh_points": 30,
+    "tol": 1e-2,
+    "bc_tol": 1e-2,
+    "max_nodes": 500,
     "verbose": 2,
     "debug_bc": True,
 }

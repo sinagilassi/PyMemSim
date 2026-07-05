@@ -1,8 +1,9 @@
 ## Case 2 / Unit 2
 
-### Flow specification
+### Unit specification
 
 - flow pattern: counter-current
+- heat transfer: isothermal
 
 ### Membrane module properties
 

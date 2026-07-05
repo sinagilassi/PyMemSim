@@ -41,7 +41,7 @@ components = [O2, N2]
 
 # NOTE: heat-transfer options
 heat_transfer_options = HeatTransferOptions(
-    heat_transfer_mode="non-isothermal",
+    heat_transfer_mode="isothermal",
     heat_transfer_coefficient=CustomProp(value=100.0, unit="W/m2.K"),
     heat_transfer_area=CustomProp(value=2.0, unit="m2"),
     jacket_temperature=Temperature(value=330.0, unit="K"),
@@ -62,7 +62,12 @@ thermo_inputs = {}
 # feed_inlet_flow = CustomProp(value=feed_molar_flow.value, unit="mol/s")
 
 # ! method 2 (alternative): directly specify feed molar flow rate
-feed_inlet_flow = CustomProp(value=0.002500, unit="mol/s")
+# CustomProp(value=4.459466110268381e-05, unit='mol/s')
+# CustomProp(value=0.0004607787955150942, unit='mol/s')
+feed_inlet_flows = [0.00050, 0.000440, 0.0001,
+                    0.00005, 0.00004, 0.000035,
+                    0.000030, 0.000025]  # [mol/s]
+feed_inlet_flow = CustomProp(value=feed_inlet_flows[0], unit="mol/s")
 
 # feed specification mode: feed mole fractions
 feed_mole_fractions = {
@@ -132,7 +137,7 @@ COUNTERCURRENT_METHOD = "bvp"  # "bvp" | "shooting"
 
 # NOTE: length span for the simulation (in meters)
 length_span = (0.0, 0.25)  # [m]
-flow_pattern_to_run = "co-current"
+flow_pattern_to_run = "counter-current"
 target_component = "O2-g"
 
 # ====================================================

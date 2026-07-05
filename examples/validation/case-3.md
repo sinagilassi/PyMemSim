@@ -3,6 +3,7 @@
 ### Flow specification
 
 - flow pattern: co-current & counter-current
+- heat transfer: isothermal
 
 ### Membrane module properties
 
