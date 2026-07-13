@@ -117,7 +117,8 @@ model_inputs_1 = {
     "permeate_inlet_temperature": Temperature(value=338.15, unit="K"),
     "permeate_pressure": Pressure(value=101, unit="kPa"),
     # NOTE: membrane parameters
-    "membrane_area_per_length": CustomProp(value=0.231, unit="m"),
+    # [m2/m] (calculated from geometry)
+    "membrane_area_per_length": CustomProp(value=0.231, unit="m2/m"),
     # NOTE: heat transfer parameters
     "overall_heat_transfer_coefficient": CustomProp(value=20.0, unit="W/m2.K"),
     "q_ext_feed": CustomProp(value=0.0, unit="W/m2"),
@@ -170,7 +171,7 @@ model_inputs_3 = {
 }
 
 # select which model inputs to use for this run
-model_inputs = model_inputs_3
+model_inputs = model_inputs_1
 
 COUNTERCURRENT_METHOD = "bvp"  # "bvp" | "shooting"
 
@@ -278,7 +279,7 @@ def run_case(flow_pattern: str, length_span: tuple[float, float]) -> MembraneRes
 
 # SETUP: run cases
 length_span = (0.0, 0.15)  # [m]
-flow_pattern_to_run = "counter-current"
+flow_pattern_to_run = "co-current"
 
 print("[bold green]Running gas HFM example for both flow patterns...[/bold green]")
 res_case = run_case(flow_pattern=flow_pattern_to_run, length_span=length_span)
