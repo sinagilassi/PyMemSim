@@ -160,15 +160,15 @@ wheels = [
 
 [[package]]
 name = "pycuc"
-version = "2.8.0"
+version = "2.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pandas" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ce/29/a8db665ac1cd71e6d87f4404df1b6df7722eb0170b79cff2b1d8632d6844/pycuc-2.8.0.tar.gz", hash = "sha256:3d50cd75fb041eeae98f3ff742e8b7ac13c506186b8b576742318d9e11a65e2a", size = 20893, upload-time = "2026-05-01T01:02:36.221Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/08/01/a2ecd132b9ee04f3e0b240588abdb9dbed69f9064d94a200b14eb4c43b79/pycuc-2.9.0.tar.gz", hash = "sha256:cf92731adc0f289438d004af943b1e2837e6c1a2495c1e84fb7bacce1b974267", size = 25665, upload-time = "2026-07-13T00:05:36.711Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/67/c906edf56444a8ad0c7bb43ceac09f46efc64a6b0f8adbf1228feb6cd89e/pycuc-2.8.0-py3-none-any.whl", hash = "sha256:faab7f0a57e3bd5bcde15ec445d56e58329d05759e9206752fa76dae12ade470", size = 28996, upload-time = "2026-05-01T01:02:34.915Z" },
+    { url = "https://files.pythonhosted.org/packages/26/1a/2da8a9c5ef3d4882ba880b8ab25d4eb0f74b9ca9c194723e4e9091fbf624/pycuc-2.9.0-py3-none-any.whl", hash = "sha256:8d7d3ef9af8491d5ddf52bd9b3115f00dc0162c394c3cefb50f1557266342db4", size = 32893, upload-time = "2026-07-13T00:05:35.622Z" },
 ]
 
 [[package]]
