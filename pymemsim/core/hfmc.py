@@ -457,17 +457,38 @@ class HFMCore(MembraneCore):
     def _parse_direct_membrane_area_per_length(self, key: str) -> float:
         raw = self.model_inputs[key]
         raw_value, raw_unit = self._extract_value_unit(raw)
-        unit = str(raw_unit).strip()
+        unit = str(raw_unit).strip().replace(" ", "").replace("^2", "2")
 
         # NOTE: area-per-length has SI unit m (equivalent to m2/m).
-        if unit in ("", "m"):
+        if unit in ("", "m", "m2/m"):
             return float(raw_value)
-        else:
-            return pycuc.convert_from_to(
-                value=float(raw_value),
-                from_unit=unit,
-                to_unit="m",
-            )
+
+        if "/" in unit:
+            try:
+                return pycuc.convert_from_to(
+                    value=float(raw_value),
+                    from_unit=unit,
+                    to_unit="m2/m",
+                )
+            except Exception:
+                numerator_unit, denominator_unit = unit.split("/", 1)
+                numerator_m2 = pycuc.convert_from_to(
+                    value=float(raw_value),
+                    from_unit=numerator_unit,
+                    to_unit="m2",
+                )
+                denominator_m = pycuc.convert_from_to(
+                    value=1.0,
+                    from_unit=denominator_unit,
+                    to_unit="m",
+                )
+                return float(numerator_m2) / float(denominator_m)
+
+        return pycuc.convert_from_to(
+            value=float(raw_value),
+            from_unit=unit,
+            to_unit="m",
+        )
 
     # ! calculating area-per-length from geometry inputs using HFMModule properties
     def _calculate_membrane_area_per_length_from_geometry(self, geometry_keys: tuple[str, ...]) -> float:
