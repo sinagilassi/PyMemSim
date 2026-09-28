@@ -294,10 +294,10 @@ class HFM:
         solver_options: Optional[Dict[str, Any]] = None,
     ) -> Optional[MembraneResult]:
         # ! check if the module type supports counter-current simulation
-        if not isinstance(self.module, (GasHFM, GasHFMX)):
+        if not isinstance(self.module, (GasHFM, GasHFMX, LiquidHFM, LiquidHFMX)):
             raise NotImplementedError(
-                "Counter-current simulation is implemented only for gas modules "
-                "(GasHFM and GasHFMX) in this release."
+                "Counter-current simulation is implemented only for supported "
+                "gas and liquid HFM modules in this release."
             )
 
         solver_options_local = solver_options.copy() if solver_options is not None else {}
