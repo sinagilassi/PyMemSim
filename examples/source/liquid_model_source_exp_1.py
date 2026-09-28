@@ -2,19 +2,17 @@
 import os
 from pathlib import Path
 from rich import print
-from typing import Callable, Dict, Optional, Union, List, Any
+from typing import List
 import pyThermoDB as ptdb
 import pyThermoLinkDB as ptdblink
 from pyThermoLinkDB import (
-    build_component_model_source,
     build_components_model_source,
     build_model_source
 )
 from pyThermoLinkDB.models import ComponentModelSource, ModelSource
-from pythermodb_settings.models import Component, Pressure, Temperature, CustomProp, Volume, CustomProperty
+from pythermodb_settings.models import Component
 from pyThermoDB import ComponentThermoDB
 from pyThermoDB import build_component_thermodb_from_reference
-from pyreactlab_core.models.reaction import Reaction
 # locals
 from examples.reference_2_liq import REFERENCE_CONTENT
 
