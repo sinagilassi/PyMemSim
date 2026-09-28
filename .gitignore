@@ -182,3 +182,6 @@ notes/
 
 # private
 private/
+
+# pkl
+*.pkl
