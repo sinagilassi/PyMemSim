@@ -8,6 +8,7 @@ from pyreactsim_core.models.rate_exp import ReactionRateExpression
 from ..sources.thermo_source import ThermoSource
 from ..utils.reaction_tools import stoichiometry_mat, stoichiometry_mat_key
 from ..utils.thermo_tools import calc_rxn_heat_generation, calc_total_heat_capacity
+from ..utils.tools import smooth_floor
 from .hfmc import HFMCore
 
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class LiquidHFM:
     """
-    Liquid-phase hollow-fiber membrane model (cocurrent, dual-side, constant pressure).
+    Liquid-phase hollow-fiber membrane model (co-current/counter-current, dual-side, constant pressure).
     """
 
     def __init__(
@@ -37,6 +38,8 @@ class LiquidHFM:
         self.heat_transfer_mode = hfm_core.heat_transfer_mode
         self.operation_mode = hfm_core.operation_mode
         self.liquid_density_mode = hfm_core.liquid_density_mode
+        # Permeate coordinate is reversed for counter-current operation.
+        self.s_p = hfm_core.permeate_axial_sign
 
         # NOTE: Normalized dual-side membrane inputs
         # ! feed inlet flows [mol/s]
@@ -123,16 +126,98 @@ class LiquidHFM:
             y0_parts.append(np.array([self.Tf_in, self.Tp_in], dtype=float))
         return np.concatenate(y0_parts)
 
+    # SECTION: Counter-current BVP helpers
+    def bc(self, ya: np.ndarray, yb: np.ndarray) -> np.ndarray:
+        """Boundary residuals with feed inlet at z=0 and permeate inlet at z=L."""
+        ns = self.component_num
+        bc_parts: List[np.ndarray] = [
+            ya[:ns] - self.Ff_in,
+            yb[ns:2 * ns] - self.Fp_in,
+        ]
+        if self.heat_transfer_mode == "non-isothermal":
+            bc_parts.append(np.array([
+                ya[2 * ns] - self.Tf_in,
+                yb[2 * ns + 1] - self.Tp_in,
+            ], dtype=float))
+        return np.concatenate(bc_parts)
+
+    def build_mesh(
+        self,
+        length_span: tuple[float, float],
+        mesh_points: int = 50,
+    ) -> np.ndarray:
+        """Build a valid solve_bvp mesh for counter-current liquid flow."""
+        z0, z1 = float(length_span[0]), float(length_span[1])
+        if z1 <= z0:
+            raise ValueError("length_span must satisfy z_end > z_start.")
+        if mesh_points < 5:
+            raise ValueError("mesh_points must be >= 5 for solve_bvp.")
+        return np.linspace(z0, z1, int(mesh_points), dtype=float)
+
+    def build_initial_guess(self, z_mesh: np.ndarray) -> np.ndarray:
+        """Build a finite counter-current BVP guess in physical units."""
+        z_mesh = np.asarray(z_mesh, dtype=float)
+        if z_mesh.ndim != 1 or z_mesh.size < 2:
+            raise ValueError("z_mesh must be a 1D array with at least two points.")
+
+        z0 = float(z_mesh[0])
+        z1 = float(z_mesh[-1])
+        if z1 <= z0:
+            raise ValueError("z_mesh must be strictly increasing.")
+
+        ns = self.component_num
+        n_points = z_mesh.size
+        eta = (z_mesh - z0) / (z1 - z0)
+
+        ff_out_guess = np.maximum(0.95 * self.Ff_in, 1e-12)
+        ff_guess = np.vstack([
+            np.linspace(float(self.Ff_in[i]), float(ff_out_guess[i]), n_points)
+            for i in range(ns)
+        ])
+
+        ff_total_in = max(float(np.sum(self.Ff_in)), 1e-30)
+        yf_in = self.Ff_in / ff_total_in
+        fp_floor_total = max(1e-30, 1e-14 * ff_total_in)
+        fp_floor_vec = fp_floor_total * np.maximum(yf_in, 1e-12)
+        fp_start_guess = np.where(
+            self.Fp_in > 0.0,
+            0.2 * self.Fp_in,
+            fp_floor_vec,
+        )
+        fp_start_guess = np.maximum(fp_start_guess, fp_floor_vec)
+        blend = eta ** 1.5
+        fp_guess = np.vstack([
+            (1.0 - blend) * float(fp_start_guess[i]) +
+            blend * float(self.Fp_in[i])
+            for i in range(ns)
+        ])
+
+        y_parts: List[np.ndarray] = [ff_guess, fp_guess]
+        if self.heat_transfer_mode == "non-isothermal":
+            tf_out_guess = 0.99 * self.Tf_in + 0.01 * self.Tp_in
+            tp_start_guess = 0.99 * self.Tp_in + 0.01 * self.Tf_in
+            y_parts.append(np.vstack([
+                np.linspace(self.Tf_in, tf_out_guess, n_points, dtype=float),
+                np.linspace(tp_start_guess, self.Tp_in, n_points, dtype=float),
+            ]))
+        return np.vstack(y_parts)
+
     # SECTION: ODE RHS builder
     def rhs(self, z: float, y: np.ndarray) -> np.ndarray:
         # NOTE: unpack state
         ns = self.component_num
-        Ff = np.clip(y[:ns], 0.0, None)
-        Fp = np.clip(y[ns:2 * ns], 0.0, None)
+        Ff = np.asarray(
+            smooth_floor(y[:ns], xmin=0.0, s=1e-12),
+            dtype=float,
+        )
+        Fp = np.asarray(
+            smooth_floor(y[ns:2 * ns], xmin=0.0, s=1e-12),
+            dtype=float,
+        )
 
         if self.heat_transfer_mode == "non-isothermal":
-            Tf = float(y[2 * ns])
-            Tp = float(y[2 * ns + 1])
+            Tf = float(smooth_floor(y[2 * ns], xmin=1.0, s=1e-3))
+            Tp = float(smooth_floor(y[2 * ns + 1], xmin=1.0, s=1e-3))
         else:
             Tf = self.Tf_in
             Tp = self.Tp_in
@@ -163,8 +248,9 @@ class LiquidHFM:
         # NOTE: material balances
         # ! feed side [mol/s.m]
         dFf_dz = -self.a_m * J + dF_rxn_f
-        # ! permeate side [mol/s.m]
-        dFp_dz = +self.a_m * J
+        # ! permeate side [mol/s.m]; reverse the axial derivative for
+        # counter-current flow so the permeate inlet is imposed at z=L.
+        dFp_dz = self.s_p * self.a_m * J
         out = np.concatenate([dFf_dz, dFp_dz])
 
         if self.heat_transfer_mode == "isothermal":
@@ -297,6 +383,7 @@ class LiquidHFM:
         # NOTE: energy balances
         # ! feed side [K/m]
         dTf_dz = self.a_m * (-q_cond + self.q_ext_f) / cp_flow_f + q_rxn_f / cp_flow_f
-        # ! permeate side [K/m]
-        dTp_dz = self.a_m * (+q_cond + self.q_ext_p) / cp_flow_p
+        # ! permeate side [K/m]; conductive transfer follows permeate axial
+        # orientation, while external permeate heat flux retains its convention.
+        dTp_dz = self.a_m * (self.s_p * q_cond + self.q_ext_p) / cp_flow_p
         return float(dTf_dz), float(dTp_dz)
