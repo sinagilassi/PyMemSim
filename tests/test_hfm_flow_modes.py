@@ -8,6 +8,7 @@ from pymemsim.core.gas_hfm import GasHFM
 from pymemsim.core.gas_hfmx import GasHFMX
 from pymemsim.core.hfmc import HFMCore
 from pymemsim.core.liquid_hfm import LiquidHFM
+from pymemsim.core.liquid_hfmx import LiquidHFMX
 from pymemsim.docs.hfm import HFM
 from pymemsim.models.hfm import HollowFiberMembraneOptions
 from pymemsim.models.results import MembraneResult
@@ -79,12 +80,61 @@ class _DummyGasPhysicalNonIsothermal(GasHFM):
         return np.array([0.0, 0.0, 0.0, 0.0], dtype=float)
 
 
-class _DummyLiquid(LiquidHFM):
+class _DummyLiquidPhysical(LiquidHFM):
     def __init__(self):
         self.component_num = 1
         self.heat_transfer_mode = "isothermal"
         self.Ff_in = np.array([1.0], dtype=float)
-        self.Fp_in = np.array([0.0], dtype=float)
+        self.Fp_in = np.array([0.2], dtype=float)
+        self.Tf_in = 300.0
+        self.Tp_in = 300.0
+        self.s_p = -1
+
+    def rhs(self, z: float, y: np.ndarray) -> np.ndarray:
+        return np.array([0.0, 0.0], dtype=float)
+
+
+class _DummyLiquidScaled(LiquidHFMX):
+    def __init__(self):
+        self.component_num = 1
+        self.heat_transfer_mode = "isothermal"
+        self.Ff_in = np.array([1.0], dtype=float)
+        self.Fp_in = np.array([0.2], dtype=float)
+        self.Ff_scale = np.array([1.0], dtype=float)
+        self.Fp_scale = np.array([0.2], dtype=float)
+        self.Tf_in = 300.0
+        self.Tp_in = 300.0
+        self.Tf_scale_ref = 300.0
+        self.Tp_scale_ref = 300.0
+        self.T_scale = 100.0
+        self.s_p = -1
+
+    def rhs_scaled(self, z: float, y_scaled: np.ndarray) -> np.ndarray:
+        return np.array([0.0, 0.0], dtype=float)
+
+
+class _DummyLiquidPhysicalNonIsothermal(LiquidHFM):
+    def __init__(self):
+        self.component_num = 1
+        self.heat_transfer_mode = "non-isothermal"
+        self.Ff_in = np.array([1.0], dtype=float)
+        self.Fp_in = np.array([0.2], dtype=float)
+        self.Tf_in = 330.0
+        self.Tp_in = 290.0
+        self.s_p = -1
+
+    def rhs(self, z: float, y: np.ndarray) -> np.ndarray:
+        return np.array([0.0, 0.0, 0.0, 0.0], dtype=float)
+
+
+class _LiquidThermoStub:
+    def calc_rho_LIQ(self, temperature):
+        _ = temperature
+        return np.array([1000.0], dtype=float)
+
+    def calc_Cp_LIQ(self, temperature):
+        _ = temperature
+        return np.array([1.0], dtype=float)
 
 
 class _ThermoStub:
@@ -256,13 +306,102 @@ def test_countercurrent_solver_invalid_option_raises():
         )
 
 
-def test_countercurrent_liquid_guardrail():
-    module = _DummyLiquid()
+def test_countercurrent_liquid_bvp_converges_physical():
+    module = _DummyLiquidPhysical()
     hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
 
-    with _expect_raises(NotImplementedError, "only for gas modules"):
-        hfm.simulate(length_span=(0.0, 1.0))
+    res = hfm.simulate(
+        length_span=(0.0, 1.0),
+        solver_options={"mesh_points": 30, "tol": 1e-5, "max_nodes": 5000},
+    )
 
+    assert res is not None
+    assert res.success is True
+    assert np.max(np.abs(module.bc(res.state[:, 0], res.state[:, -1]))) < 1e-6
+    assert np.all(np.isfinite(res.state))
+    assert np.all(res.state >= 0.0)
+
+
+def test_countercurrent_liquid_bvp_converges_scaled():
+    module = _DummyLiquidScaled()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+
+    res = hfm.simulate(
+        length_span=(0.0, 1.0),
+        solver_options={"mesh_points": 30, "tol": 1e-5, "max_nodes": 5000},
+    )
+
+    assert res is not None
+    assert res.success is True
+    assert np.all(np.isfinite(res.state))
+    assert np.all(res.state >= 0.0)
+
+
+def test_countercurrent_liquid_shooting_converges_physical_and_scaled():
+    for module in (_DummyLiquidPhysical(), _DummyLiquidScaled()):
+        hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+        res = hfm.simulate(
+            length_span=(0.0, 1.0),
+            solver_options={"countercurrent_solver": "shooting"},
+        )
+
+        assert res is not None
+        assert res.success is True
+        assert np.all(np.isfinite(res.state))
+        assert np.all(res.state >= 0.0)
+
+
+def test_countercurrent_liquid_nonisothermal_terminal_temperature_enforced():
+    module = _DummyLiquidPhysicalNonIsothermal()
+    hfm = _build_hfm_with_module(module=module, flow_pattern="counter-current")
+
+    res = hfm.simulate(
+        length_span=(0.0, 1.0),
+        solver_options={"countercurrent_solver": "shooting"},
+    )
+
+    assert res is not None
+    assert res.success is True
+    bc_res = module.bc(res.state[:, 0], res.state[:, -1])
+    assert abs(float(bc_res[-1])) < 1e-6
+
+
+def test_countercurrent_liquid_permeate_material_and_thermal_signs():
+    module = LiquidHFM.__new__(LiquidHFM)
+    module.component_num = 1
+    module.heat_transfer_mode = "isothermal"
+    module.Ff_in = np.array([1.0], dtype=float)
+    module.Fp_in = np.array([0.2], dtype=float)
+    module.Tf_in = 320.0
+    module.Tp_in = 300.0
+    module.qf_in = 1.0
+    module.qp_in = 1.0
+    module.operation_mode = "constant_volume"
+    module.k_i = np.array([2.0], dtype=float)
+    module.a_m = 1.0
+    module.s_p = -1
+    module.reaction_rates = []
+    module.thermo_source = _LiquidThermoStub()
+
+    material_rhs = module.rhs(0.0, np.array([1.0, 0.2], dtype=float))
+    assert np.isclose(material_rhs[0], material_rhs[1])
+    assert material_rhs[0] < 0.0
+
+    module.heat_transfer_mode = "non-isothermal"
+    module.U_m = 2.0
+    module.q_ext_f = 0.0
+    module.q_ext_p = 1.0
+    d_tf, d_tp = module._build_temperature_derivatives(
+        Ff=np.array([2.0], dtype=float),
+        Fp=np.array([1.0], dtype=float),
+        Cf=np.array([2.0], dtype=float),
+        Tf=320.0,
+        Tp=300.0,
+    )
+
+    q_cond = module.U_m * (320.0 - 300.0)
+    assert np.isclose(d_tp, module.a_m * (-q_cond + module.q_ext_p))
+    assert np.isfinite(d_tf)
 
 def test_countercurrent_zero_permeate_guess_stays_positive_and_finite():
     module = _DummyGasPhysical()
