@@ -7,6 +7,8 @@ from scipy.optimize import least_squares
 
 from ..core.gas_hfm import GasHFM
 from ..core.gas_hfmx import GasHFMX
+from ..core.liquid_hfm import LiquidHFM
+from ..core.liquid_hfmx import LiquidHFMX
 from ..models.results import MembraneResult
 
 
@@ -15,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def solve_countercurrent_shooting(
     *,
-    module: GasHFM | GasHFMX,
+    module: GasHFM | GasHFMX | LiquidHFM | LiquidHFMX,
     rhs_point: Callable[[float, np.ndarray], np.ndarray],
     state_to_physical: Callable[[np.ndarray], np.ndarray],
     length_span: tuple[float, float],
@@ -50,7 +52,7 @@ def solve_countercurrent_shooting(
     shooting_xtol = float(options.pop("shooting_xtol", 1e-8))
     shooting_gtol = float(options.pop("shooting_gtol", 1e-8))
 
-    if isinstance(module, GasHFMX):
+    if isinstance(module, (GasHFMX, LiquidHFMX)):
         y_template = np.asarray(module.build_y0_scaled(), dtype=float)
     else:
         y_template = np.asarray(module.build_y0(), dtype=float)
